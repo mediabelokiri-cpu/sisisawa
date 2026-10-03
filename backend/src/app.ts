@@ -25,21 +25,21 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/settings', settingRoutes);
+// Routes - supporting both prefixed /api/ and direct paths
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/dashboard', '/dashboard'], dashboardRoutes);
+app.use(['/api/categories', '/categories'], categoryRoutes);
+app.use(['/api/products', '/products'], productRoutes);
+app.use(['/api/transactions', '/transactions'], transactionRoutes);
+app.use(['/api/reports', '/reports'], reportRoutes);
+app.use(['/api/users', '/users'], userRoutes);
+app.use(['/api/settings', '/settings'], settingRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health', '/api', '/'], (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Kasirku POS API Server is running',
+    message: 'SISISAWA POS API Server is running',
     timestamp: new Date().toISOString(),
   });
 });

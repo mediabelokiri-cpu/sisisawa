@@ -9,10 +9,11 @@ async function bootstrap() {
     await initDatabase();
     console.log('Database initialized successfully.');
 
-    app.listen(PORT, () => {
+    const portNum = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
+    app.listen(portNum, '0.0.0.0', () => {
       console.log(`===========================================`);
-      console.log(`🚀 Kasirku POS Backend Server running on:`);
-      console.log(`   http://localhost:${PORT}`);
+      console.log(`🚀 SISISAWA POS Backend Server running on:`);
+      console.log(`   http://0.0.0.0:${portNum}`);
       console.log(`===========================================`);
     });
   } catch (err) {
