@@ -2,7 +2,7 @@
   "name": "kasirku-backend",
   "version": "1.0.0",
   "description": "Backend REST API for Kasirku UMKM POS",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",

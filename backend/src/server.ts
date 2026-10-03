@@ -3,10 +3,8 @@ import { initDatabase } from './config/db.js';
 
 const PORT = process.env.PORT || 5050;
 
-async function bootstrap() {
+if (!process.env.VERCEL) {
   const portNum = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
-
-  // 1. Bind port immediately so health checks & requests are answered instantly
   app.listen(portNum, '0.0.0.0', () => {
     console.log(`===========================================`);
     console.log(`🚀 SISISAWA POS Backend Server running on:`);
@@ -14,14 +12,9 @@ async function bootstrap() {
     console.log(`===========================================`);
   });
 
-  // 2. Initialize database connection
-  try {
-    console.log('Initializing PostgreSQL database connection...');
-    await initDatabase();
-    console.log('Database initialized successfully.');
-  } catch (err) {
-    console.error('Initial DB connect attempt failed, will retry on demand:', err);
-  }
+  initDatabase().catch((err) => {
+    console.error('Initial DB connect attempt failed:', err);
+  });
 }
 
-bootstrap();
+export default app;
