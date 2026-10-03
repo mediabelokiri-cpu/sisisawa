@@ -11,11 +11,13 @@ import { RekapLaporan } from './pages/admin/RekapLaporan';
 import { KasirUser } from './pages/admin/KasirUser';
 import { Pengaturan } from './pages/admin/Pengaturan';
 import { PosPlaceholder } from './pages/cashier/PosPlaceholder';
+import { PWAInstallPrompt } from './components/ui/PWAInstallPrompt';
 
 export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PWAInstallPrompt />
         <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />

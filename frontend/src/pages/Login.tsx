@@ -6,8 +6,8 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState<string>('admin');
-  const [password, setPassword] = useState<string>('admin123');
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -38,17 +38,6 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleQuickFill = (userType: 'admin' | 'kasir') => {
-    if (userType === 'admin') {
-      setUsername('admin');
-      setPassword('admin123');
-    } else {
-      setUsername('kasir');
-      setPassword('kasir123');
-    }
-    setError('');
-  };
-
   return (
     <div className="min-h-screen bg-[#EFEFEF] flex items-center justify-center p-4 sm:p-6 lg:p-8 selection:bg-[#835227]/30 relative overflow-hidden">
       {/* Soft Ambient Background Circles */}
@@ -58,7 +47,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-20 h-20 rounded-3xl bg-black border border-[#CBC6B2]/40 items-center justify-center p-1 shadow-xl shadow-[#835227]/20 mb-4 overflow-hidden">
+          <div className="inline-flex w-20 h-20 rounded-3xl bg-[#3E2410] border border-[#CBC6B2]/40 items-center justify-center p-2.5 shadow-xl shadow-[#835227]/20 mb-4 overflow-hidden">
             <img src="/logo.png" alt="SISISAWA Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex items-center justify-center gap-2">
@@ -127,37 +116,6 @@ export const Login: React.FC = () => {
               </button>
             </div>
           </form>
-
-          {/* Quick Demo Credentials Switcher */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2.5 text-center">
-              Pilihan Akun Cepat (Quick Fill)
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin')}
-                className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
-                  username === 'admin'
-                    ? 'bg-[#835227] text-white border-[#835227] shadow-xs'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                Admin (admin123)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('kasir')}
-                className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
-                  username === 'kasir'
-                    ? 'bg-[#835227] text-white border-[#835227] shadow-xs'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                Kasir (kasir123)
-              </button>
-            </div>
-          </div>
         </Card>
 
         {/* Security Note */}

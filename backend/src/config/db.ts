@@ -192,17 +192,14 @@ async function runMigrationsAndSeeds(client: DBClient) {
     console.log('Seeding initial database records...');
 
     const salt = await bcrypt.genSalt(10);
-    const adminHash = await bcrypt.hash('admin123', salt);
-    const kasirHash = await bcrypt.hash('kasir123', salt);
+    const adminHash = await bcrypt.hash('ownerilo123', salt);
 
-    // Insert Users
+    // Insert Admin User ownerilo
     await client.query(
       `INSERT INTO users (name, username, password_hash, role, status) VALUES 
-       ($1, $2, $3, $4, $5),
-       ($6, $7, $8, $9, $10)`,
+       ($1, $2, $3, $4, $5)`,
       [
-        'Administrator Toko', 'admin', adminHash, 'ADMIN', 'Active',
-        'Kasir Utama', 'kasir', kasirHash, 'KASIR', 'Active'
+        'Owner Ilo', 'ownerilo', adminHash, 'ADMIN', 'Active'
       ]
     );
 
