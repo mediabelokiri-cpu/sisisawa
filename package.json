@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "description": "Aplikasi Kasir / POS SISISAWA UMKM Berbasis Web",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
     "start": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm --prefix backend start\" \"npm --prefix frontend run dev\"",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "start:backend": "npm --prefix backend start",
+    "build:backend": "npx esbuild backend/src/app.ts --bundle --platform=node --target=node18 --format=cjs --outfile=api/_bundle.cjs --external:pg-native",
     "build:frontend": "npm --prefix frontend run build",
-    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+    "build": "npm run build:backend && npm run build:frontend"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -30,6 +30,7 @@
     "@types/pg": "^8.11.11",
     "@vercel/node": "^20.0.0",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.25.0",
     "typescript": "^5.7.3"
   }
 }
