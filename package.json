@@ -11,7 +11,7 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "start:backend": "npm --prefix backend start",
     "build:frontend": "npm --prefix frontend run build",
-    "build": "npm run build:frontend"
+    "build": "npm --prefix backend run build && npm --prefix frontend run build"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

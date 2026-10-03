@@ -90,10 +90,6 @@ app.get('/health', handleHealth);
 app.get('/api', handleHealth);
 app.get('/', handleHealth);
 
-const handler = (req: express.Request, res: express.Response) => {
-  return app(req, res);
-};
-
 export { app };
-export default handler;
+export default app;
 
