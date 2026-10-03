@@ -1,5 +1,4 @@
 import pg from 'pg';
-import { PGlite } from '@electric-sql/pglite';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -40,7 +39,8 @@ export async function initDatabase(): Promise<DBClient> {
       const pool = new Pool({
         connectionString: databaseUrl,
         ssl: isCloudPg ? { rejectUnauthorized: false } : undefined,
-        connectionTimeoutMillis: 8000,
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
       });
 
       await pool.query('SELECT 1');
@@ -54,48 +54,39 @@ export async function initDatabase(): Promise<DBClient> {
         }
       };
     } catch (err) {
-      console.warn('PostgreSQL Server connection failed, falling back to embedded PostgreSQL engine (PGlite)...', err);
+      console.warn('PostgreSQL Server connection failed:', err);
     }
   }
 
   if (!dbClient) {
-    let pgliteInstance: PGlite | null = null;
-    const isCloudEnv = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.RENDER);
-
+    // Dynamic import for local dev only so serverless doesn't crash on WASM
     try {
-      if (isCloudEnv) {
-        // In-memory PGlite on serverless / cloud if persistent storage is not available
-        pgliteInstance = new PGlite();
-        await pgliteInstance.waitReady;
-      } else {
-        const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
-        const dataDir = process.env.PGDATA_DIR || path.resolve(rootDir, 'data', 'pgdata');
-        if (!fs.existsSync(path.dirname(dataDir))) {
-          fs.mkdirSync(path.dirname(dataDir), { recursive: true });
-        }
-
-        console.log(`Starting Embedded PostgreSQL Engine (PGlite) at: ${dataDir}`);
-        pgliteInstance = new PGlite(dataDir);
-        await pgliteInstance.waitReady;
+      const { PGlite } = await import('@electric-sql/pglite');
+      const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
+      const dataDir = process.env.PGDATA_DIR || path.resolve(rootDir, 'data', 'pgdata');
+      if (!fs.existsSync(path.dirname(dataDir))) {
+        fs.mkdirSync(path.dirname(dataDir), { recursive: true });
       }
-    } catch (pgInitErr) {
-      console.warn('Falling back to in-memory PGlite instance...', pgInitErr);
-      pgliteInstance = new PGlite();
+
+      console.log(`Starting Embedded PostgreSQL Engine (PGlite) at: ${dataDir}`);
+      const pgliteInstance = new PGlite(dataDir);
       await pgliteInstance.waitReady;
-    }
 
-    const activePglite = pgliteInstance;
-    dbClient = {
-      type: 'pglite',
-      query: async <T = any>(text: string, params?: any[]) => {
-        const res = await activePglite.query<T>(text, params);
-        return {
-          rows: (res.rows || []) as T[],
-          rowCount: res.rows ? res.rows.length : 0
-        };
-      }
-    };
-    console.log('Embedded PostgreSQL Engine ready.');
+      dbClient = {
+        type: 'pglite',
+        query: async <T = any>(text: string, params?: any[]) => {
+          const res = await pgliteInstance.query<T>(text, params);
+          return {
+            rows: (res.rows || []) as T[],
+            rowCount: res.rows ? res.rows.length : 0
+          };
+        }
+      };
+      console.log('Embedded PostgreSQL Engine ready.');
+    } catch (pgErr) {
+      console.error('Fallback DB connection error:', pgErr);
+      throw new Error('Database connection could not be established');
+    }
   }
 
   await runMigrationsAndSeeds(dbClient);

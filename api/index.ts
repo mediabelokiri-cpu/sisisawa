@@ -10,7 +10,7 @@ export default async function handler(req: Request, res: Response) {
       await initDatabase();
       isDbInitialized = true;
     } catch (err) {
-      console.error('Failed to initialize database on Vercel serverless function:', err);
+      console.error('Failed to initialize database on Vercel serverless startup:', err);
     }
   }
   return app(req, res);
