@@ -9,6 +9,7 @@ import transactionRoutes from './routes/transactionRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import settingRoutes from './routes/settingRoutes.js';
+import { initDatabase } from './config/db.js';
 
 dotenv.config();
 
@@ -25,6 +26,16 @@ app.use(
 );
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Middleware to ensure DB connection is ready for incoming requests
+app.use(async (req, res, next) => {
+  try {
+    await initDatabase();
+  } catch (err) {
+    console.error('Database connection error in request handler:', err);
+  }
+  next();
+});
 
 // Routes - supporting both prefixed /api/ and direct paths
 app.use('/api/auth', authRoutes);
@@ -52,28 +63,31 @@ app.use('/api/settings', settingRoutes);
 app.use('/settings', settingRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'SISISAWA POS API Server is running',
-    timestamp: new Date().toISOString(),
-  });
-});
+const handleHealth = async (req: express.Request, res: express.Response) => {
+  try {
+    const client = await initDatabase();
+    await client.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      dbType: client.type,
+      databaseConnected: true,
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      message: 'SISISAWA POS API Server is running',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 'error',
+      message: err?.message || 'Database connection error',
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'SISISAWA POS API Server is running',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'SISISAWA POS API Server is running',
-    timestamp: new Date().toISOString(),
-  });
-});
+app.get('/api/health', handleHealth);
+app.get('/health', handleHealth);
+app.get('/api', handleHealth);
+app.get('/', handleHealth);
 
 export default app;

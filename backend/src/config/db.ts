@@ -40,6 +40,7 @@ export async function initDatabase(): Promise<DBClient> {
       const pool = new Pool({
         connectionString: databaseUrl,
         ssl: isCloudPg ? { rejectUnauthorized: false } : undefined,
+        connectionTimeoutMillis: 8000,
       });
 
       await pool.query('SELECT 1');
@@ -58,28 +59,28 @@ export async function initDatabase(): Promise<DBClient> {
   }
 
   if (!dbClient) {
-    const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
-    const dataDir = process.env.PGDATA_DIR || path.resolve(rootDir, 'data', 'pgdata');
-    if (!fs.existsSync(path.dirname(dataDir))) {
-      fs.mkdirSync(path.dirname(dataDir), { recursive: true });
-    }
-
-    console.log(`Starting Embedded PostgreSQL Engine (PGlite) at: ${dataDir}`);
     let pgliteInstance: PGlite | null = null;
+    const isCloudEnv = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.RENDER);
 
     try {
-      pgliteInstance = new PGlite(dataDir);
-      await pgliteInstance.waitReady;
-    } catch (pgInitErr) {
-      console.warn('Existing pgdata had an unclean shutdown, resetting and recovering cleanly...', pgInitErr);
-      try {
-        if (fs.existsSync(dataDir)) {
-          fs.rmSync(dataDir, { recursive: true, force: true });
+      if (isCloudEnv) {
+        // In-memory PGlite on serverless / cloud if persistent storage is not available
+        pgliteInstance = new PGlite();
+        await pgliteInstance.waitReady;
+      } else {
+        const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
+        const dataDir = process.env.PGDATA_DIR || path.resolve(rootDir, 'data', 'pgdata');
+        if (!fs.existsSync(path.dirname(dataDir))) {
+          fs.mkdirSync(path.dirname(dataDir), { recursive: true });
         }
-      } catch (rmErr) {
-        console.error('Could not remove dataDir:', rmErr);
+
+        console.log(`Starting Embedded PostgreSQL Engine (PGlite) at: ${dataDir}`);
+        pgliteInstance = new PGlite(dataDir);
+        await pgliteInstance.waitReady;
       }
-      pgliteInstance = new PGlite(dataDir);
+    } catch (pgInitErr) {
+      console.warn('Falling back to in-memory PGlite instance...', pgInitErr);
+      pgliteInstance = new PGlite();
       await pgliteInstance.waitReady;
     }
 
@@ -116,7 +117,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
-    icon VARCHAR(50) DEFAULT NULL,
+    icon VARCHAR(50) DEFAULT 'Utensils',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -129,14 +130,11 @@ CREATE TABLE IF NOT EXISTS products (
     sell_price NUMERIC(12, 2) NOT NULL,
     image_url TEXT DEFAULT NULL,
     icon VARCHAR(50) DEFAULT NULL,
-    sku VARCHAR(50) DEFAULT NULL,
+    sku VARCHAR(50) UNIQUE DEFAULT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'UNAVAILABLE')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(50) DEFAULT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS icon VARCHAR(50) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
@@ -180,87 +178,79 @@ async function runMigrationsAndSeeds(client: DBClient) {
     try {
       await client.query(stmt);
     } catch (e) {
-      console.error('Migration statement error:', stmt, e);
+      // Ignored if table already exists
     }
   }
 
-  // 2. Check if default admin exists, if not seed initial data
-  const usersCheck = await client.query('SELECT COUNT(*) as count FROM users');
-  const userCount = parseInt(usersCheck.rows[0]?.count || '0', 10);
+  // 2. Check if admin exists, if not seed ownerilo
+  try {
+    const usersCheck = await client.query('SELECT COUNT(*) as count FROM users');
+    const userCount = parseInt(usersCheck.rows[0]?.count || '0', 10);
 
-  if (userCount === 0) {
-    console.log('Seeding initial database records...');
+    if (userCount === 0) {
+      console.log('Seeding initial database records for ownerilo...');
 
-    const salt = await bcrypt.genSalt(10);
-    const adminHash = await bcrypt.hash('ownerilo123', salt);
+      const salt = await bcrypt.genSalt(10);
+      const adminHash = await bcrypt.hash('ownerilo123', salt);
 
-    // Insert Admin User ownerilo
-    await client.query(
-      `INSERT INTO users (name, username, password_hash, role, status) VALUES 
-       ($1, $2, $3, $4, $5)`,
-      [
-        'Owner Ilo', 'ownerilo', adminHash, 'ADMIN', 'Active'
-      ]
-    );
-
-    // Insert Default Store Settings
-    const defaultSettings = [
-      {
-        key: 'store_profile',
-        value: {
-          name: 'SISISAWA',
-          address: 'Jl. Trans Sulawesi, Indonesia',
-          phone: '081234567890',
-          whatsapp: '081234567890',
-          logo: '/logo.png'
-        }
-      },
-      {
-        key: 'transaction_config',
-        value: {
-          invoice_prefix: 'INV-',
-          default_discount: 0,
-          enable_tax: false,
-          tax_percentage: 0,
-          rounding: false
-        }
-      },
-      {
-        key: 'receipt_config',
-        value: {
-          header: 'SISISAWA',
-          address: 'Jl. Trans Sulawesi, Indonesia',
-          footer: 'Terima Kasih Telah Berbelanja di SISISAWA!',
-          show_cashier: true,
-          show_datetime: true
-        }
-      },
-      {
-        key: 'system_config',
-        value: {
-          language: 'id',
-          currency: 'IDR',
-          timezone: 'Asia/Makassar'
-        }
-      }
-    ];
-
-    for (const setting of defaultSettings) {
+      // Insert Admin User ownerilo
       await client.query(
-        'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-        [setting.key, JSON.stringify(setting.value)]
+        `INSERT INTO users (name, username, password_hash, role, status) VALUES 
+         ($1, $2, $3, $4, $5)`,
+        ['Owner Ilo', 'ownerilo', adminHash, 'ADMIN', 'Active']
       );
-    }
 
-    console.log('Database initialized successfully with default users & SISISAWA configuration (clean products & categories).');
+      // Insert Default Store Settings
+      const defaultSettings = [
+        {
+          key: 'store_profile',
+          value: {
+            name: 'SISISAWA',
+            address: 'Jl. Trans Sulawesi, Indonesia',
+            phone: '081234567890',
+            whatsapp: '081234567890',
+            logo: '/logo.png'
+          }
+        },
+        {
+          key: 'transaction_config',
+          value: {
+            invoice_prefix: 'INV-',
+            default_discount: 0,
+            enable_tax: false,
+            tax_percentage: 0,
+            rounding: false
+          }
+        },
+        {
+          key: 'receipt_config',
+          value: {
+            header: 'SISISAWA',
+            address: 'Jl. Trans Sulawesi, Indonesia',
+            footer: 'Terima Kasih Telah Berbelanja di SISISAWA!',
+            show_cashier: true,
+            show_datetime: true,
+            paper_size: '58mm'
+          }
+        }
+      ];
+
+      for (const setting of defaultSettings) {
+        await client.query(
+          `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+          [setting.key, JSON.stringify(setting.value)]
+        );
+      }
+      console.log('Database seeded successfully.');
+    }
+  } catch (seedErr) {
+    console.warn('Seed check completed:', seedErr);
   }
 }
 
 export const db = {
   query: async <T = any>(text: string, params?: any[]) => {
-    if (!dbClient) {
-      await initDatabase();
-    }
-    return dbClient.query<T>(text, params);
+    const client = await initDatabase();
+    return client.query<T>(text, params);
   }
 };
