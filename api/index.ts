@@ -1,17 +1,14 @@
 import type { Request, Response } from 'express';
-import app from '../backend/src/app.js';
-import { initDatabase } from '../backend/src/config/db.js';
+import rawApp from '../backend/dist/app.js';
+import { initDatabase } from '../backend/dist/config/db.js';
 
-let isDbInitialized = false;
+const app: any = (rawApp as any).default || rawApp;
 
 export default async function handler(req: Request, res: Response) {
-  if (!isDbInitialized) {
-    try {
-      await initDatabase();
-      isDbInitialized = true;
-    } catch (err) {
-      console.error('Failed to initialize database on Vercel serverless startup:', err);
-    }
+  try {
+    await initDatabase();
+  } catch (err) {
+    console.error('Database connection error in serverless handler:', err);
   }
   return app(req, res);
 }
