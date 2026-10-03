@@ -90,4 +90,10 @@ app.get('/health', handleHealth);
 app.get('/api', handleHealth);
 app.get('/', handleHealth);
 
-export default app;
+const handler = (req: express.Request, res: express.Response) => {
+  return app(req, res);
+};
+
+export { app };
+export default handler;
+
