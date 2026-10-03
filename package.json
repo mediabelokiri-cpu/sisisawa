@@ -10,7 +10,7 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "start:backend": "npm --prefix backend start",
-    "build:backend": "npx esbuild backend/src/app.ts --bundle --platform=node --target=node18 --format=esm --outfile=api/index.js --external:pg --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "build:backend": "npx esbuild backend/src/app.ts --bundle --platform=node --target=node18 --format=esm --outfile=api/index.js --external:pg-native --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm run build:backend && npm run build:frontend"
   },
