@@ -1,12 +1,14 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
-import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
 const { Pool } = pg;
+
+// Supabase PostgreSQL Cloud Database URL with fallback
+const SUPABASE_DB_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres.xzjijjrtjbnryvsvrflx:Brip%40l007123@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
 
 interface QueryResult<T = any> {
   rows: T[];
@@ -15,96 +17,43 @@ interface QueryResult<T = any> {
 
 interface DBClient {
   query: <T = any>(text: string, params?: any[]) => Promise<QueryResult<T>>;
-  type: 'pg' | 'pglite';
+  type: 'pg';
 }
 
-let dbClient: DBClient | null = null;
-let initPromise: Promise<DBClient> | null = null;
+let pool: pg.Pool | null = null;
+
+export function getPool(): pg.Pool {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: SUPABASE_DB_URL,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 15000,
+      idleTimeoutMillis: 30000,
+      max: 10,
+    });
+
+    pool.on('error', (err) => {
+      console.error('Unexpected error on idle pg client', err);
+    });
+  }
+  return pool;
+}
 
 export async function initDatabase(): Promise<DBClient> {
-  if (dbClient) return dbClient;
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    const databaseUrl = process.env.DATABASE_URL;
-
-    if (databaseUrl && databaseUrl.trim() !== '') {
-      try {
-        console.log('Connecting to PostgreSQL server via DATABASE_URL...');
-        const isCloudPg =
-          databaseUrl.includes('supabase') ||
-          databaseUrl.includes('pooler.supabase.com') ||
-          databaseUrl.includes('neon.tech') ||
-          databaseUrl.includes('render.com') ||
-          databaseUrl.includes('railway.app') ||
-          databaseUrl.includes('sslmode=require');
-
-        const pool = new Pool({
-          connectionString: databaseUrl,
-          ssl: isCloudPg ? { rejectUnauthorized: false } : undefined,
-          connectionTimeoutMillis: 10000,
-          idleTimeoutMillis: 30000,
-        });
-
-        await pool.query('SELECT 1');
-        console.log('Connected to PostgreSQL Server successfully.');
-
-        const client: DBClient = {
-          type: 'pg',
-          query: async <T = any>(text: string, params?: any[]) => {
-            const res = await pool.query(text, params);
-            return { rows: res.rows as T[], rowCount: res.rowCount };
-          }
-        };
-        dbClient = client;
-        return client;
-      } catch (err) {
-        console.warn('PostgreSQL Server connection failed:', err);
-      }
-    }
-
-    if (!dbClient) {
-      try {
-        const { PGlite } = await import('@electric-sql/pglite');
-        const rootDir = process.cwd().endsWith('backend') ? path.resolve(process.cwd(), '..') : process.cwd();
-        const dataDir = process.env.PGDATA_DIR || path.resolve(rootDir, 'data', 'pgdata');
-        if (!fs.existsSync(path.dirname(dataDir))) {
-          fs.mkdirSync(path.dirname(dataDir), { recursive: true });
-        }
-
-        console.log(`Starting Embedded PostgreSQL Engine (PGlite) at: ${dataDir}`);
-        const pgliteInstance = new PGlite(dataDir);
-        await pgliteInstance.waitReady;
-
-        const client: DBClient = {
-          type: 'pglite',
-          query: async <T = any>(text: string, params?: any[]) => {
-            const res = await pgliteInstance.query<T>(text, params);
-            return {
-              rows: (res.rows || []) as T[],
-              rowCount: res.rows ? res.rows.length : 0
-            };
-          }
-        };
-        dbClient = client;
-        console.log('Embedded PostgreSQL Engine ready.');
-        return client;
-      } catch (pgErr) {
-        console.error('Fallback DB connection error:', pgErr);
-        throw new Error('Database connection could not be established');
-      }
-    }
-
-    return dbClient;
-  })();
-
-  const client = await initPromise;
-  return client;
+  const p = getPool();
+  return {
+    type: 'pg',
+    query: async <T = any>(text: string, params?: any[]) => {
+      const res = await p.query(text, params);
+      return { rows: res.rows as T[], rowCount: res.rowCount };
+    },
+  };
 }
 
 export const db = {
   query: async <T = any>(text: string, params?: any[]) => {
-    const client = await initDatabase();
-    return client.query<T>(text, params);
-  }
+    const p = getPool();
+    const res = await p.query(text, params);
+    return { rows: res.rows as T[], rowCount: res.rowCount };
+  },
 };
