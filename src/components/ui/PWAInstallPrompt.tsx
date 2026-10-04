@@ -96,8 +96,8 @@ export const PWAInstallPrompt: React.FC = () => {
 
         <div className="flex items-start gap-3.5">
           {/* App Logo */}
-          <div className="w-12 h-12 rounded-2xl bg-[#835227] border border-[#CBC6B2]/30 p-1.5 shrink-0 flex items-center justify-center shadow-md">
-            <img src="/logo.png" alt="SISISAWA" className="w-full h-full object-contain" />
+          <div className="w-12 h-12 rounded-2xl bg-[#835227] border border-[#CBC6B2]/30 p-1 shrink-0 flex items-center justify-center shadow-md overflow-hidden">
+            <img src="/app-icon.png" alt="SISISAWA" className="w-full h-full object-cover rounded-xl" />
           </div>
 
           <div className="flex-1 pr-4">
