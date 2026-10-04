@@ -9,10 +9,13 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
-  Printer,
   RefreshCw,
   AlertCircle,
-  Package
+  Package,
+  FileSpreadsheet,
+  FileText,
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -80,6 +83,7 @@ export const RekapLaporan: React.FC = () => {
   const [reportData, setReportData] = useState<MonthlyReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
+  const [exportMessage, setExportMessage] = useState<string>('');
 
   const monthsList = [
     { value: '1', label: 'Januari' },
@@ -148,6 +152,82 @@ export const RekapLaporan: React.FC = () => {
     }).format(val);
   };
 
+  const showNotification = (msg: string) => {
+    setExportMessage(msg);
+    setTimeout(() => setExportMessage(''), 4000);
+  };
+
+  // Export to Excel / CSV
+  const handleExportExcel = () => {
+    if (!reportData) return;
+
+    try {
+      const storeName = reportData.storeProfile?.name || 'SISISAWA POS UMKM';
+      const storeAddress = reportData.storeProfile?.address || '-';
+      const storePhone = reportData.storeProfile?.phone || '-';
+      const periodStr = `${reportData.period.monthName.toUpperCase()} ${reportData.period.year}`;
+      const nowStr = new Date().toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      // Build CSV with UTF-8 BOM so Excel opens it with proper encoding & accents
+      let csv = '\uFEFF';
+      csv += `"${storeName.replace(/"/g, '""')}"\n`;
+      csv += `"Alamat: ${storeAddress.replace(/"/g, '""')} | Telp: ${storePhone}"\n`;
+      csv += `"LAPORAN REKAP PERFORMA PENJUALAN BULANAN"\n`;
+      csv += `"Periode: ${periodStr}"\n`;
+      csv += `"Waktu Unduh: ${nowStr}"\n\n`;
+
+      csv += `"=== RINGKASAN KINERJA PENJUALAN ==="\n`;
+      csv += `"Indikator","Nilai","Perbandingan vs ${reportData.period.previousMonthName}"\n`;
+      csv += `"Total Penjualan",${reportData.summary.totalSales},"${reportData.summary.comparison.salesGrowth !== null ? `${reportData.summary.comparison.salesGrowth}%` : 'Stabil'}"\n`;
+      csv += `"Total Transaksi",${reportData.summary.totalTransactions},"${reportData.summary.comparison.transactionsGrowth !== null ? `${reportData.summary.comparison.transactionsGrowth}%` : 'Stabil'}"\n`;
+      csv += `"Total Item Terjual",${reportData.summary.totalItemsSold},"${reportData.summary.comparison.itemsGrowth !== null ? `${reportData.summary.comparison.itemsGrowth}%` : 'Stabil'}"\n`;
+      csv += `"Rata-rata Transaksi",${reportData.summary.averageTransaction},"${reportData.summary.comparison.avgGrowth !== null ? `${reportData.summary.comparison.avgGrowth}%` : 'Stabil'}"\n\n`;
+
+      csv += `"=== RINCIAN OMSET HARIAN ==="\n`;
+      csv += `"Tanggal","Hari Ke","Jumlah Transaksi","Total Omset Penjualan (Rp)"\n`;
+      reportData.dailyChart.forEach((d) => {
+        csv += `"${d.date}",${d.day},${d.count},${d.total}\n`;
+      });
+      csv += `\n`;
+
+      csv += `"=== TOP 5 PRODUK TERLARIS ==="\n`;
+      csv += `"Peringkat","Nama Produk","Kategori","Qty Terjual","Total Pendapatan (Rp)"\n`;
+      reportData.topProducts.forEach((p, idx) => {
+        csv += `${idx + 1},"${p.productName.replace(/"/g, '""')}","${p.categoryName.replace(/"/g, '""')}",${p.totalQty},${p.totalRevenue}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeMonth = reportData.period.monthName.replace(/\s+/g, '_');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Laporan_Penjualan_${safeMonth}_${reportData.period.year}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showNotification('Laporan format Excel/CSV berhasil diunduh.');
+    } catch (err) {
+      console.error('Export Excel error:', err);
+      setError('Gagal mengekspor laporan ke Excel.');
+    }
+  };
+
+  // Export to PDF via Browser Print
+  const handleExportPDF = () => {
+    showNotification('Membuka pratinjau cetak/simpan PDF...');
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
+
   const renderGrowthBadge = (growth: number | null, prevLabel: string) => {
     if (growth === null || isNaN(growth)) {
       return (
@@ -187,14 +267,14 @@ export const RekapLaporan: React.FC = () => {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Top Header & Month/Year Selector */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-xs no-print">
         <div>
           <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2.5">
             <BarChart3 className="text-[#835227]" size={22} />
             <span>Rekap Laporan Bulanan 📈</span>
           </h2>
           <p className="text-xs text-slate-400 font-medium">
-            Analisis tren kinerja penjualan, perbandingan pertumbuhan, dan produk favorit
+            Analisis tren kinerja penjualan, perbandingan pertumbuhan, dan ekspor dokumen
           </p>
         </div>
 
@@ -245,33 +325,63 @@ export const RekapLaporan: React.FC = () => {
             Segarkan
           </Button>
 
+          {/* Export to Excel Button */}
+          <Button
+            variant="outline"
+            size="md"
+            icon={<FileSpreadsheet size={18} className="text-emerald-600" />}
+            onClick={handleExportExcel}
+            className="rounded-2xl border-emerald-200 hover:bg-emerald-50 text-emerald-800 font-bold"
+            title="Unduh laporan dalam format Excel/CSV"
+          >
+            Export Excel
+          </Button>
+
+          {/* Export to PDF Button */}
           <Button
             variant="secondary"
             size="md"
-            icon={<Printer size={18} />}
-            onClick={() => window.print()}
-            className="rounded-2xl bg-[#835227] hover:bg-[#6F441E] text-white"
+            icon={<FileText size={18} />}
+            onClick={handleExportPDF}
+            className="rounded-2xl bg-[#835227] hover:bg-[#6F441E] text-white font-bold"
+            title="Cetak atau simpan laporan sebagai PDF"
           >
-            Cetak Laporan
+            Export PDF
           </Button>
         </div>
       </div>
 
+      {/* Notifications */}
+      {exportMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm flex items-center gap-2.5 shadow-xs font-bold animate-fadeIn no-print">
+          <CheckCircle2 size={20} className="shrink-0 text-emerald-600" />
+          <span>{exportMessage}</span>
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-2.5 shadow-xs font-bold">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-2.5 shadow-xs font-bold no-print">
           <AlertCircle size={20} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Printable Report Document Header (visible only when printing or at the top) */}
-      <div className="hidden print:block text-center pb-4 border-b border-slate-300">
-        <h1 className="text-xl font-extrabold uppercase text-slate-900">
-          {reportData?.storeProfile?.name || 'KASIRKU POS UMKM'}
+      {/* Printable Report Document Header (Visible for PDF/Print) */}
+      <div className="hidden print:block text-center pb-6 mb-6 border-b-2 border-slate-800">
+        <h1 className="text-2xl font-black uppercase text-slate-900 tracking-tight">
+          {reportData?.storeProfile?.name || 'SISISAWA POS UMKM'}
         </h1>
-        <p className="text-sm text-slate-600">
-          LAPORAN REKAP PERFORMA PENJUALAN BULAN {reportData?.period.monthName.toUpperCase()} {reportData?.period.year}
+        <p className="text-xs text-slate-600 font-medium">
+          {reportData?.storeProfile?.address || 'Makassar, Indonesia'} | Telp: {reportData?.storeProfile?.phone || '-'}
         </p>
+        <div className="mt-4 pt-3 border-t border-slate-200">
+          <h2 className="text-base font-extrabold uppercase text-slate-800">
+            LAPORAN REKAP PERFORMA PENJUALAN BULANAN
+          </h2>
+          <p className="text-xs text-slate-500 font-semibold">
+            PERIODE: {reportData?.period.monthName.toUpperCase()} {reportData?.period.year}
+          </p>
+        </div>
       </div>
 
       {loading && !reportData ? (
@@ -291,7 +401,7 @@ export const RekapLaporan: React.FC = () => {
                     {formatIDR(reportData.summary.totalSales)}
                   </h3>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#835227]/10 text-[#835227] flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-[#835227]/10 text-[#835227] flex items-center justify-center shrink-0 no-print">
                   <DollarSign size={24} />
                 </div>
               </div>
@@ -318,7 +428,7 @@ export const RekapLaporan: React.FC = () => {
                     {reportData.summary.totalTransactions} <span className="text-sm font-semibold text-slate-400">Nota</span>
                   </h3>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#CBC6B2]/30 text-[#835227] flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-[#CBC6B2]/30 text-[#835227] flex items-center justify-center shrink-0 no-print">
                   <Receipt size={24} />
                 </div>
               </div>
@@ -345,7 +455,7 @@ export const RekapLaporan: React.FC = () => {
                     {reportData.summary.totalItemsSold} <span className="text-sm font-semibold text-slate-400">Pcs</span>
                   </h3>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#8B9793]/20 text-[#8B9793] flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-[#8B9793]/20 text-[#8B9793] flex items-center justify-center shrink-0 no-print">
                   <ShoppingBag size={24} />
                 </div>
               </div>
@@ -362,17 +472,17 @@ export const RekapLaporan: React.FC = () => {
             </Card>
 
             {/* 4. Rata-rata Transaksi */}
-            <Card className="p-5 flex flex-col justify-between border-slate-200 hover:shadow-subtle-lg transition-shadow">
+            <Card className="p-5 sm:p-6 flex flex-col justify-between border-slate-100 hover:border-[#835227]/40 transition-all">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-1">
                     Rata-rata Transaksi
                   </span>
-                  <h3 className="text-2xl font-extrabold text-slate-900">
+                  <h3 className="text-2xl font-black text-slate-900">
                     {formatIDR(reportData.summary.averageTransaction)}
                   </h3>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 no-print">
                   <TrendingUp size={24} />
                 </div>
               </div>
@@ -382,15 +492,15 @@ export const RekapLaporan: React.FC = () => {
                   reportData.summary.comparison.avgGrowth,
                   reportData.period.previousMonthName
                 )}
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] font-medium text-slate-400">
                   Lalu: {formatIDR(reportData.summary.comparison.prevAverageTransaction)}
                 </span>
               </div>
             </Card>
           </div>
 
-          {/* DAILY SALES CHART IN THE SELECTED MONTH */}
-          <Card className="p-5 sm:p-6">
+          {/* DAILY SALES CHART IN THE SELECTED MONTH (Hidden on Print if preferred, or shown) */}
+          <Card className="p-5 sm:p-6 no-print">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">
@@ -449,9 +559,66 @@ export const RekapLaporan: React.FC = () => {
                     strokeWidth={3}
                     fillOpacity={1}
                     fill="url(#monthSalesGrad)"
+                    activeDot={{ r: 6, fill: '#835227', stroke: '#FFFFFF', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* TABEL RINCIAN OMSET HARIAN (Visible on Screen & Print) */}
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar size={20} className="text-[#835227]" />
+                  <span>Rincian Omset Penjualan Harian</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Daftar rekapitulasi penjualan per hari pada bulan {reportData.period.monthName} {reportData.period.year}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[500px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 text-xs uppercase font-semibold">
+                    <th className="py-3 px-4 w-14 text-center">Hari</th>
+                    <th className="py-3 px-4">Tanggal</th>
+                    <th className="py-3 px-4 text-center">Jumlah Transaksi</th>
+                    <th className="py-3 px-4 text-right">Total Omset Penjualan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {reportData.dailyChart.filter(d => d.total > 0 || d.count > 0).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-400">
+                        Belum ada transaksi penjualan tercatat pada bulan {reportData.period.monthName} {reportData.period.year}.
+                      </td>
+                    </tr>
+                  ) : (
+                    reportData.dailyChart.map((d, idx) => (
+                      <tr key={idx} className={`hover:bg-slate-50/60 transition-colors ${d.total > 0 ? 'font-medium' : 'text-slate-400 opacity-60'}`}>
+                        <td className="py-2.5 px-4 text-center font-bold">
+                          {d.day}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {d.label} {reportData.period.year}
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-extrabold ${d.count > 0 ? 'bg-[#835227]/10 text-[#835227]' : 'bg-slate-100 text-slate-400'}`}>
+                            {d.count} Nota
+                          </span>
+                        </td>
+                        <td className={`py-2.5 px-4 text-right font-extrabold ${d.total > 0 ? 'text-[#835227]' : 'text-slate-400'}`}>
+                          {formatIDR(d.total)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </Card>
 
@@ -460,11 +627,11 @@ export const RekapLaporan: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <Package size={20} className="text-brand-secondary" />
-                  <span>Produk Terlaris Bulan {reportData.period.monthName}</span>
+                  <Package size={20} className="text-[#835227]" />
+                  <span>Top 5 Produk Terlaris Bulan {reportData.period.monthName}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Daftar 5 produk dengan jumlah kuantitas terjual terbanyak pada bulan terpilih
+                  Daftar produk dengan kuantitas item terjual terbanyak pada bulan terpilih
                 </p>
               </div>
             </div>
@@ -500,11 +667,11 @@ export const RekapLaporan: React.FC = () => {
                           {p.categoryName}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-extrabold">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#835227]/10 text-[#835227] text-xs font-extrabold">
                             {p.totalQty} Pcs
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right font-extrabold text-brand-primary">
+                        <td className="py-3 px-4 text-right font-extrabold text-[#835227]">
                           {formatIDR(p.totalRevenue)}
                         </td>
                       </tr>
