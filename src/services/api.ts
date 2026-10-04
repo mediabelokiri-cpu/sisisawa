@@ -516,12 +516,11 @@ export const api = {
 
     // 2. Add Category: /categories
     if (path === 'categories') {
-      const { name, description, icon } = bodyData;
+      const { name, icon } = bodyData;
       const { data, error } = await supabase
         .from('categories')
         .insert({
           name: String(name).trim(),
-          description: description ? String(description).trim() : null,
           icon: icon || 'Tag',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -536,7 +535,6 @@ export const api = {
         data: {
           id: data.id,
           name: data.name,
-          description: data.description,
           icon: data.icon,
           product_count: 0,
           productCount: 0,
@@ -705,13 +703,12 @@ export const api = {
     // 1. Edit Category: /categories/:id
     if (path.startsWith('categories/')) {
       const id = Number(path.split('/')[1]);
-      const { name, description, icon } = bodyData;
+      const { name, icon } = bodyData;
 
       const { data, error } = await supabase
         .from('categories')
         .update({
           name: String(name).trim(),
-          description: description ? String(description).trim() : null,
           icon: icon || 'Tag',
           updated_at: new Date().toISOString(),
         })
@@ -726,7 +723,6 @@ export const api = {
         data: {
           id: data.id,
           name: data.name,
-          description: data.description,
           icon: data.icon,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
