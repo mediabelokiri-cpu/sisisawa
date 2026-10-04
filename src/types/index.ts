@@ -55,6 +55,7 @@ export interface DashboardSummary {
 
 export interface ChartDataPoint {
   date: string;
+  label?: string;
   total: number;
   count: number;
 }

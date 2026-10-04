@@ -297,11 +297,11 @@ export const Dashboard: React.FC = () => {
                   <defs>
                     <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#835227" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#8B9793" stopOpacity={0.0} />
+                      <stop offset="95%" stopColor="#835227" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                  <XAxis dataKey="date" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                  <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
                   <YAxis
                     stroke="#94A3B8"
                     fontSize={11}
@@ -309,13 +309,21 @@ export const Dashboard: React.FC = () => {
                     tickFormatter={(val) => `Rp${val / 1000}k`}
                   />
                   <Tooltip
-                    formatter={(val: any) => [formatIDR(Number(val)), 'Total Penjualan']}
-                    labelFormatter={(label) => `Tanggal: ${label}`}
+                    formatter={(val: any, _name: any, item: any) => [
+                      `${formatIDR(Number(val))} (${item.payload.count || 0} nota)`,
+                      'Total Omset'
+                    ]}
+                    labelFormatter={(label, payload) => {
+                      const dateFull = payload?.[0]?.payload?.date || label;
+                      return `Periode: ${label} (${dateFull})`;
+                    }}
                     contentStyle={{
                       backgroundColor: '#FFFFFF',
                       borderRadius: '16px',
                       boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                      border: '1px solid #E2E8F0'
+                      border: '1px solid #E2E8F0',
+                      fontSize: '12px',
+                      fontWeight: '600'
                     }}
                   />
                   <Area
@@ -325,6 +333,7 @@ export const Dashboard: React.FC = () => {
                     strokeWidth={3}
                     fillOpacity={1}
                     fill="url(#salesGrad)"
+                    activeDot={{ r: 6, fill: '#835227', stroke: '#FFFFFF', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>

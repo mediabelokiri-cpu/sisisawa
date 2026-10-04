@@ -158,22 +158,30 @@ export const api = {
       const range = query.range || '30d';
       const now = new Date();
       let startDate = new Date();
+      let endDate = new Date();
 
       if (range === 'today') {
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       } else if (range === '7d') {
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (range === 'custom' && query.startDate) {
+        startDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (range === 'custom' && query.startDate && query.endDate) {
         startDate = new Date(query.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(query.endDate);
+        endDate.setHours(23, 59, 59, 999);
       } else {
         // 30d default
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        startDate = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+        startDate.setHours(0, 0, 0, 0);
       }
 
       const { data: txs } = await supabase
         .from('transactions')
         .select('*, users(id, name, username), transaction_items(*)')
         .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: false });
 
       const { data: allTxsRaw } = await supabase
@@ -196,17 +204,78 @@ export const api = {
       const averageTransaction =
         totalTransactions > 0 ? Math.round(totalSales / totalTransactions) : 0;
 
-      // Group chart data by date
-      const chartMap: Record<string, { date: string; total: number; count: number }> = {};
-      filteredTxs.forEach((t) => {
-        const dateKey = t.created_at.split('T')[0];
-        if (!chartMap[dateKey]) {
-          chartMap[dateKey] = { date: dateKey, total: 0, count: 0 };
+      // Generate continuous chart data timeline
+      let chartData: Array<{ date: string; label: string; total: number; count: number }> = [];
+
+      if (range === 'today') {
+        const intervals = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+        const todayIso = now.toISOString().split('T')[0];
+        const slotMap: Record<string, { total: number; count: number }> = {};
+        intervals.forEach((iv) => {
+          slotMap[iv] = { total: 0, count: 0 };
+        });
+
+        filteredTxs.forEach((t) => {
+          const txDate = new Date(t.created_at);
+          const hours = txDate.getHours();
+          let matchedSlot = '22:00';
+          if (hours < 9) matchedSlot = '08:00';
+          else if (hours < 11) matchedSlot = '10:00';
+          else if (hours < 13) matchedSlot = '12:00';
+          else if (hours < 15) matchedSlot = '14:00';
+          else if (hours < 17) matchedSlot = '16:00';
+          else if (hours < 19) matchedSlot = '18:00';
+          else if (hours < 21) matchedSlot = '20:00';
+          else matchedSlot = '22:00';
+
+          if (slotMap[matchedSlot]) {
+            slotMap[matchedSlot].total += Number(t.total);
+            slotMap[matchedSlot].count += 1;
+          }
+        });
+
+        chartData = intervals.map((iv) => ({
+          date: `${todayIso} ${iv}`,
+          label: iv,
+          total: slotMap[iv].total,
+          count: slotMap[iv].count,
+        }));
+      } else {
+        const dayCount =
+          range === '7d'
+            ? 7
+            : range === '30d'
+            ? 30
+            : Math.min(60, Math.max(1, Math.ceil(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+        const dateMap: Record<string, { label: string; total: number; count: number }> = {};
+
+        for (let i = 0; i < dayCount; i++) {
+          const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+          const iso = d.toISOString().split('T')[0];
+          const day = String(d.getDate()).padStart(2, '0');
+          const mon = INDO_MONTHS_SHORT[d.getMonth()];
+          dateMap[iso] = {
+            label: `${day} ${mon}`,
+            total: 0,
+            count: 0,
+          };
         }
-        chartMap[dateKey].total += Number(t.total);
-        chartMap[dateKey].count += 1;
-      });
-      const chartData = Object.values(chartMap).sort((a, b) => a.date.localeCompare(b.date));
+
+        filteredTxs.forEach((t) => {
+          const iso = t.created_at.split('T')[0];
+          if (dateMap[iso]) {
+            dateMap[iso].total += Number(t.total);
+            dateMap[iso].count += 1;
+          }
+        });
+
+        chartData = Object.keys(dateMap).map((dateKey) => ({
+          date: dateKey,
+          label: dateMap[dateKey].label,
+          total: dateMap[dateKey].total,
+          count: dateMap[dateKey].count,
+        }));
+      }
 
       // Calculate top products
       const productMap: Record<string, { productName: string; categoryName: string; totalQty: number; totalRevenue: number }> = {};
