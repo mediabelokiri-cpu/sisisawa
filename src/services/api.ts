@@ -1,10 +1,8 @@
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
 
-// Helper to simulate Axios response shape: { data: ... }
 const wrapResponse = <T>(data: T) => ({ data });
 
-// Helper to parse path and query parameters
 function parseUrl(url: string) {
   const [pathname, queryString] = url.split('?');
   const query: Record<string, string> = {};
@@ -14,13 +12,11 @@ function parseUrl(url: string) {
       query[k] = v;
     });
   }
-  // Strip leading /api or /
   const cleanPath = pathname.replace(/^\/api/, '').replace(/^\//, '');
   return { path: cleanPath, query };
 }
 
 export const api = {
-  // Mock interceptors to prevent errors in existing code
   interceptors: {
     request: { use: () => {} },
     response: { use: () => {} },
@@ -70,34 +66,36 @@ export const api = {
 
     // 3. Categories List
     if (path === 'categories') {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('categories')
         .select('*')
         .order('name', { ascending: true });
 
+      if (query.search) {
+        queryBuilder = queryBuilder.ilike('name', `%${query.search}%`);
+      }
+
+      const { data, error } = await queryBuilder;
       if (error) throw { response: { data: { message: error.message } } };
+
+      const { data: prods } = await supabase.from('products').select('category_id');
+      const counts: Record<number, number> = {};
+      if (prods) {
+        prods.forEach((p) => {
+          counts[p.category_id] = (counts[p.category_id] || 0) + 1;
+        });
+      }
 
       const formatted = (data || []).map((c) => ({
         id: c.id,
         name: c.name,
         description: c.description,
         icon: c.icon,
-        productCount: 0, // Computed dynamically
+        product_count: counts[c.id] || 0,
+        productCount: counts[c.id] || 0,
         createdAt: c.created_at,
         updatedAt: c.updated_at,
       }));
-
-      // Count products per category
-      const { data: prods } = await supabase.from('products').select('category_id');
-      if (prods) {
-        const counts: Record<number, number> = {};
-        prods.forEach((p) => {
-          counts[p.category_id] = (counts[p.category_id] || 0) + 1;
-        });
-        formatted.forEach((c) => {
-          c.productCount = counts[c.id] || 0;
-        });
-      }
 
       return wrapResponse({ success: true, data: formatted });
     }
@@ -146,7 +144,168 @@ export const api = {
       return wrapResponse({ success: true, data: formatted });
     }
 
-    // 5. Transactions List
+    // 5. Dashboard Stats: /dashboard/stats
+    if (path === 'dashboard/stats') {
+      const range = query.range || '30d';
+      const now = new Date();
+      let startDate = new Date();
+
+      if (range === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (range === '7d') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (range === 'custom' && query.startDate) {
+        startDate = new Date(query.startDate);
+      } else {
+        // 30d default
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+
+      const { data: txs } = await supabase
+        .from('transactions')
+        .select('*, transaction_items(*)')
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
+
+      const { data: allTxsRaw } = await supabase
+        .from('transactions')
+        .select('*, transaction_items(*)')
+        .order('created_at', { ascending: false });
+
+      const filteredTxs = txs || [];
+      const allTxs = allTxsRaw || [];
+
+      // Calculate totals for selected range
+      const totalSales = filteredTxs.reduce((sum, t) => sum + Number(t.total_amount), 0);
+      const totalTransactions = filteredTxs.length;
+      let totalItemsSold = 0;
+      filteredTxs.forEach((t) => {
+        (t.transaction_items || []).forEach((i: any) => {
+          totalItemsSold += Number(i.quantity || 0);
+        });
+      });
+      const averageTransaction =
+        totalTransactions > 0 ? Math.round(totalSales / totalTransactions) : 0;
+
+      // Group chart data by date
+      const chartMap: Record<string, { date: string; total: number; count: number }> = {};
+      filteredTxs.forEach((t) => {
+        const dateKey = t.created_at.split('T')[0];
+        if (!chartMap[dateKey]) {
+          chartMap[dateKey] = { date: dateKey, total: 0, count: 0 };
+        }
+        chartMap[dateKey].total += Number(t.total_amount);
+        chartMap[dateKey].count += 1;
+      });
+      const chartData = Object.values(chartMap).sort((a, b) => a.date.localeCompare(b.date));
+
+      // Calculate top products
+      const productMap: Record<string, { productName: string; categoryName: string; totalQty: number; totalRevenue: number }> = {};
+      filteredTxs.forEach((t) => {
+        (t.transaction_items || []).forEach((i: any) => {
+          const key = i.product_name;
+          if (!productMap[key]) {
+            productMap[key] = {
+              productName: i.product_name,
+              categoryName: i.category_name || 'Umum',
+              totalQty: 0,
+              totalRevenue: 0,
+            };
+          }
+          productMap[key].totalQty += Number(i.quantity || 0);
+          productMap[key].totalRevenue += Number(i.subtotal || 0);
+        });
+      });
+      const topProducts = Object.values(productMap)
+        .sort((a, b) => b.totalQty - a.totalQty)
+        .slice(0, 5);
+
+      // Recent 5 transactions
+      const recentTransactions = allTxs.slice(0, 5).map((t: any) => ({
+        id: t.id,
+        invoiceNumber: t.invoice_number,
+        cashierName: t.cashier_name,
+        total: Number(t.total_amount),
+        paymentMethod: t.payment_method,
+        status: t.status || 'Completed',
+        createdAt: t.created_at,
+        itemCount: (t.transaction_items || []).reduce(
+          (sum: number, i: any) => sum + Number(i.quantity || 0),
+          0
+        ),
+      }));
+
+      return wrapResponse({
+        success: true,
+        data: {
+          summary: {
+            totalSales,
+            totalTransactions,
+            totalItemsSold,
+            averageTransaction,
+          },
+          chartData,
+          topProducts,
+          recentTransactions,
+        },
+      });
+    }
+
+    // 6. Single Transaction Detail: /dashboard/transactions/:id or /transactions/:id
+    if (path.startsWith('dashboard/transactions/') || path.startsWith('transactions/')) {
+      const parts = path.split('/');
+      const id = Number(parts[parts.length - 1]);
+
+      const { data: t, error } = await supabase
+        .from('transactions')
+        .select('*, transaction_items(*)')
+        .eq('id', id)
+        .single();
+
+      if (error || !t) throw { response: { data: { message: 'Transaksi tidak ditemukan.' } } };
+
+      const { data: receiptSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'receipt_config')
+        .single();
+
+      const { data: storeSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'store_profile')
+        .single();
+
+      return wrapResponse({
+        success: true,
+        data: {
+          transaction: {
+            id: t.id,
+            invoiceNumber: t.invoice_number,
+            createdAt: t.created_at,
+            cashierName: t.cashier_name,
+            subtotal: Number(t.subtotal),
+            discount: Number(t.discount),
+            tax: Number(t.tax),
+            total: Number(t.total_amount),
+            paymentMethod: t.payment_method,
+            status: t.status || 'Completed',
+          },
+          items: (t.transaction_items || []).map((item: any) => ({
+            id: item.id,
+            productId: item.product_id,
+            productName: item.product_name,
+            price: Number(item.sell_price),
+            quantity: Number(item.quantity),
+            subtotal: Number(item.subtotal),
+          })),
+          receiptConfig: receiptSetting?.value || null,
+          storeProfile: storeSetting?.value || null,
+        },
+      });
+    }
+
+    // 7. Transactions List: /transactions
     if (path === 'transactions') {
       let queryBuilder = supabase
         .from('transactions')
@@ -184,6 +343,7 @@ export const api = {
         cashAmount: t.cash_amount !== null ? Number(t.cash_amount) : null,
         changeAmount: t.change_amount !== null ? Number(t.change_amount) : null,
         paymentMethod: t.payment_method,
+        status: t.status || 'Completed',
         notes: t.notes,
         createdAt: t.created_at,
         items: (t.transaction_items || []).map((item: any) => ({
@@ -199,143 +359,6 @@ export const api = {
       }));
 
       return wrapResponse({ success: true, data: formatted });
-    }
-
-    // 6. Single Transaction Detail: /transactions/:id
-    if (path.startsWith('transactions/')) {
-      const id = Number(path.split('/')[1]);
-      const { data: t, error } = await supabase
-        .from('transactions')
-        .select('*, transaction_items(*)')
-        .eq('id', id)
-        .single();
-
-      if (error || !t) throw { response: { data: { message: 'Transaksi tidak ditemukan.' } } };
-
-      return wrapResponse({
-        success: true,
-        data: {
-          id: t.id,
-          invoiceNumber: t.invoice_number,
-          cashierId: t.cashier_id,
-          cashierName: t.cashier_name,
-          subtotal: Number(t.subtotal),
-          discount: Number(t.discount),
-          tax: Number(t.tax),
-          totalAmount: Number(t.total_amount),
-          cashAmount: t.cash_amount !== null ? Number(t.cash_amount) : null,
-          changeAmount: t.change_amount !== null ? Number(t.change_amount) : null,
-          paymentMethod: t.payment_method,
-          notes: t.notes,
-          createdAt: t.created_at,
-          items: (t.transaction_items || []).map((item: any) => ({
-            id: item.id,
-            productId: item.product_id,
-            productName: item.product_name,
-            categoryName: item.category_name,
-            buyPrice: item.buy_price !== null ? Number(item.buy_price) : null,
-            sellPrice: Number(item.sell_price),
-            quantity: Number(item.quantity),
-            subtotal: Number(item.subtotal),
-          })),
-        },
-      });
-    }
-
-    // 7. Dashboard Stats: /dashboard/stats
-    if (path === 'dashboard/stats') {
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-
-      const { data: txs } = await supabase
-        .from('transactions')
-        .select('*, transaction_items(*)')
-        .order('created_at', { ascending: false });
-
-      const { data: allProducts } = await supabase.from('products').select('*');
-
-      const allTxs = txs || [];
-      const todayTxs = allTxs.filter((t) => t.created_at >= startOfDay);
-
-      const totalRevenueToday = todayTxs.reduce((sum, t) => sum + Number(t.total_amount), 0);
-      const totalTransactionsToday = todayTxs.length;
-
-      // Calculate total profit today
-      let totalProfitToday = 0;
-      todayTxs.forEach((t) => {
-        (t.transaction_items || []).forEach((item: any) => {
-          const buy = item.buy_price !== null ? Number(item.buy_price) : 0;
-          const sell = Number(item.sell_price);
-          const qty = Number(item.quantity);
-          totalProfitToday += (sell - buy) * qty;
-        });
-      });
-
-      // Recent transactions (last 5)
-      const recentTransactions = allTxs.slice(0, 5).map((t) => ({
-        id: t.id,
-        invoiceNumber: t.invoice_number,
-        cashierName: t.cashier_name,
-        totalAmount: Number(t.total_amount),
-        paymentMethod: t.payment_method,
-        createdAt: t.created_at,
-      }));
-
-      // Top products sold
-      const productSalesMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
-      allTxs.forEach((t) => {
-        (t.transaction_items || []).forEach((item: any) => {
-          const key = item.product_name;
-          if (!productSalesMap[key]) {
-            productSalesMap[key] = { name: key, quantity: 0, revenue: 0 };
-          }
-          productSalesMap[key].quantity += Number(item.quantity);
-          productSalesMap[key].revenue += Number(item.subtotal);
-        });
-      });
-
-      const topProducts = Object.values(productSalesMap)
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5);
-
-      // Hourly sales today
-      const hourlyMap: Record<string, number> = {};
-      for (let i = 0; i < 24; i++) {
-        const hourLabel = `${String(i).padStart(2, '0')}:00`;
-        hourlyMap[hourLabel] = 0;
-      }
-      todayTxs.forEach((t) => {
-        const date = new Date(t.created_at);
-        const hourLabel = `${String(date.getHours()).padStart(2, '0')}:00`;
-        hourlyMap[hourLabel] = (hourlyMap[hourLabel] || 0) + Number(t.total_amount);
-      });
-      const hourlySales = Object.entries(hourlyMap).map(([hour, revenue]) => ({ hour, revenue }));
-
-      // Payment methods breakdown
-      const paymentBreakdownMap: Record<string, number> = {};
-      allTxs.forEach((t) => {
-        paymentBreakdownMap[t.payment_method] = (paymentBreakdownMap[t.payment_method] || 0) + 1;
-      });
-      const paymentBreakdown = Object.entries(paymentBreakdownMap).map(([method, count]) => ({
-        method,
-        count,
-      }));
-
-      return wrapResponse({
-        success: true,
-        data: {
-          today: {
-            revenue: totalRevenueToday,
-            transactions: totalTransactionsToday,
-            profit: totalProfitToday,
-            totalProducts: (allProducts || []).length,
-          },
-          recentTransactions,
-          topProducts,
-          hourlySales,
-          paymentBreakdown,
-        },
-      });
     }
 
     // 8. Monthly Report: /reports/monthly
@@ -407,12 +430,23 @@ export const api = {
 
       if (error) throw { response: { data: { message: error.message } } };
 
+      const { data: allTxs } = await supabase.from('transactions').select('cashier_id');
+      const txCounts: Record<number, number> = {};
+      if (allTxs) {
+        allTxs.forEach((t) => {
+          if (t.cashier_id) {
+            txCounts[t.cashier_id] = (txCounts[t.cashier_id] || 0) + 1;
+          }
+        });
+      }
+
       const formatted = (data || []).map((u) => ({
         id: u.id,
         name: u.name,
         username: u.username,
         role: u.role,
         status: u.status,
+        transactionCount: txCounts[u.id] || 0,
         createdAt: u.created_at,
         updatedAt: u.updated_at,
       }));
@@ -504,6 +538,7 @@ export const api = {
           name: data.name,
           description: data.description,
           icon: data.icon,
+          product_count: 0,
           productCount: 0,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
@@ -575,7 +610,6 @@ export const api = {
 
       const generatedInvoice = invoiceNumber || `INV-${Date.now()}`;
 
-      // Insert transaction header
       const { data: tx, error: txError } = await supabase
         .from('transactions')
         .insert({
@@ -597,7 +631,6 @@ export const api = {
 
       if (txError) throw { response: { data: { message: txError.message } } };
 
-      // Insert transaction items
       if (items && items.length > 0) {
         const itemRows = items.map((item: any) => ({
           transaction_id: tx.id,
@@ -905,7 +938,6 @@ export const api = {
       });
     }
 
-    // Fallback to put
     return this.put(url, bodyData, _config);
   },
 
