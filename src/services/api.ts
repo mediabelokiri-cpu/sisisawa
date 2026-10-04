@@ -172,20 +172,20 @@ export const api = {
 
       const { data: txs } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
 
       const { data: allTxsRaw } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .order('created_at', { ascending: false });
 
       const filteredTxs = txs || [];
       const allTxs = allTxsRaw || [];
 
       // Calculate totals for selected range
-      const totalSales = filteredTxs.reduce((sum, t) => sum + Number(t.total_amount), 0);
+      const totalSales = filteredTxs.reduce((sum, t) => sum + Number(t.total), 0);
       const totalTransactions = filteredTxs.length;
       let totalItemsSold = 0;
       filteredTxs.forEach((t) => {
@@ -203,7 +203,7 @@ export const api = {
         if (!chartMap[dateKey]) {
           chartMap[dateKey] = { date: dateKey, total: 0, count: 0 };
         }
-        chartMap[dateKey].total += Number(t.total_amount);
+        chartMap[dateKey].total += Number(t.total);
         chartMap[dateKey].count += 1;
       });
       const chartData = Object.values(chartMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -216,7 +216,7 @@ export const api = {
           if (!productMap[key]) {
             productMap[key] = {
               productName: i.product_name,
-              categoryName: i.category_name || 'Umum',
+              categoryName: 'Menu',
               totalQty: 0,
               totalRevenue: 0,
             };
@@ -234,10 +234,10 @@ export const api = {
         id: t.id,
         invoiceNumber: t.invoice_number,
         invoice_number: t.invoice_number,
-        cashierName: t.cashier_name,
-        cashier_name: t.cashier_name,
-        total: Number(t.total_amount),
-        totalAmount: Number(t.total_amount),
+        cashierName: t.users?.name || 'Kasir',
+        cashier_name: t.users?.name || 'Kasir',
+        total: Number(t.total),
+        totalAmount: Number(t.total),
         paymentMethod: t.payment_method,
         payment_method: t.payment_method,
         status: t.status || 'Completed',
@@ -291,7 +291,7 @@ export const api = {
 
       const { data: t, error } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .eq('id', id)
         .single();
 
@@ -318,24 +318,23 @@ export const api = {
             invoice_number: t.invoice_number,
             createdAt: t.created_at,
             created_at: t.created_at,
-            cashierId: t.cashier_id,
-            cashier_id: t.cashier_id,
-            cashierName: t.cashier_name,
-            cashier_name: t.cashier_name,
+            cashierId: t.user_id,
+            cashier_id: t.user_id,
+            cashierName: t.users?.name || 'Kasir',
+            cashier_name: t.users?.name || 'Kasir',
             subtotal: Number(t.subtotal),
-            discount: Number(t.discount),
-            tax: Number(t.tax),
-            total: Number(t.total_amount),
-            totalAmount: Number(t.total_amount),
-            total_amount: Number(t.total_amount),
-            cashAmount: t.cash_amount !== null ? Number(t.cash_amount) : null,
-            cash_amount: t.cash_amount !== null ? Number(t.cash_amount) : null,
-            changeAmount: t.change_amount !== null ? Number(t.change_amount) : null,
-            change_amount: t.change_amount !== null ? Number(t.change_amount) : null,
+            discount: Number(t.discount || 0),
+            tax: Number(t.tax || 0),
+            total: Number(t.total),
+            totalAmount: Number(t.total),
+            total_amount: Number(t.total),
+            cashAmount: Number(t.total),
+            cash_amount: Number(t.total),
+            changeAmount: 0,
+            change_amount: 0,
             paymentMethod: t.payment_method,
             payment_method: t.payment_method,
             status: t.status || 'Completed',
-            notes: t.notes,
           },
           items: (t.transaction_items || []).map((item: any) => ({
             id: item.id,
@@ -343,13 +342,11 @@ export const api = {
             product_id: item.product_id,
             productName: item.product_name,
             product_name: item.product_name,
-            categoryName: item.category_name || 'Umum',
-            category_name: item.category_name || 'Umum',
-            price: Number(item.sell_price),
-            sellPrice: Number(item.sell_price),
-            sell_price: Number(item.sell_price),
-            buyPrice: item.buy_price !== null ? Number(item.buy_price) : null,
-            buy_price: item.buy_price !== null ? Number(item.buy_price) : null,
+            categoryName: 'Menu',
+            category_name: 'Menu',
+            price: Number(item.price),
+            sellPrice: Number(item.price),
+            sell_price: Number(item.price),
             quantity: Number(item.quantity),
             subtotal: Number(item.subtotal),
           })),
@@ -363,7 +360,7 @@ export const api = {
     if (path === 'transactions') {
       let queryBuilder = supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .order('created_at', { ascending: false });
 
       if (query.startDate) {
@@ -385,9 +382,9 @@ export const api = {
       }
 
       if (query.cashierId && query.cashierId !== 'all') {
-        queryBuilder = queryBuilder.eq('cashier_id', Number(query.cashierId));
+        queryBuilder = queryBuilder.eq('user_id', Number(query.cashierId));
       } else if (query.cashier_id && query.cashier_id !== 'all') {
-        queryBuilder = queryBuilder.eq('cashier_id', Number(query.cashier_id));
+        queryBuilder = queryBuilder.eq('user_id', Number(query.cashier_id));
       }
 
       if (query.status && query.status !== 'ALL') {
@@ -415,24 +412,19 @@ export const api = {
         id: t.id,
         invoiceNumber: t.invoice_number,
         invoice_number: t.invoice_number,
-        cashierId: t.cashier_id,
-        cashier_id: t.cashier_id,
-        cashierName: t.cashier_name,
-        cashier_name: t.cashier_name,
+        cashierId: t.user_id,
+        cashier_id: t.user_id,
+        cashierName: t.users?.name || 'Kasir',
+        cashier_name: t.users?.name || 'Kasir',
         subtotal: Number(t.subtotal),
-        discount: Number(t.discount),
-        tax: Number(t.tax),
-        total: Number(t.total_amount),
-        totalAmount: Number(t.total_amount),
-        total_amount: Number(t.total_amount),
-        cashAmount: t.cash_amount !== null ? Number(t.cash_amount) : null,
-        cash_amount: t.cash_amount !== null ? Number(t.cash_amount) : null,
-        changeAmount: t.change_amount !== null ? Number(t.change_amount) : null,
-        change_amount: t.change_amount !== null ? Number(t.change_amount) : null,
+        discount: Number(t.discount || 0),
+        tax: Number(t.tax || 0),
+        total: Number(t.total),
+        totalAmount: Number(t.total),
+        total_amount: Number(t.total),
         paymentMethod: t.payment_method,
         payment_method: t.payment_method,
         status: t.status || 'Completed',
-        notes: t.notes,
         createdAt: t.created_at,
         created_at: t.created_at,
         itemCount: (t.transaction_items || []).reduce(
@@ -445,13 +437,9 @@ export const api = {
           product_id: item.product_id,
           productName: item.product_name,
           product_name: item.product_name,
-          categoryName: item.category_name || 'Umum',
-          category_name: item.category_name || 'Umum',
-          buyPrice: item.buy_price !== null ? Number(item.buy_price) : null,
-          buy_price: item.buy_price !== null ? Number(item.buy_price) : null,
-          price: Number(item.sell_price),
-          sellPrice: Number(item.sell_price),
-          sell_price: Number(item.sell_price),
+          price: Number(item.price),
+          sellPrice: Number(item.price),
+          sell_price: Number(item.price),
           quantity: Number(item.quantity),
           subtotal: Number(item.subtotal),
         })),
@@ -490,7 +478,7 @@ export const api = {
       // Current month transactions
       const { data: currentTxs, error: currErr } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .gte('created_at', startDate)
         .lte('created_at', endDate)
         .order('created_at', { ascending: true });
@@ -500,7 +488,7 @@ export const api = {
       // Previous month transactions
       const { data: prevTxs } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*, users(id, name, username), transaction_items(*)')
         .gte('created_at', prevStartDate)
         .lte('created_at', prevEndDate);
 
@@ -508,7 +496,7 @@ export const api = {
       const allPrev = prevTxs || [];
 
       // Current Month Summary
-      const totalSales = allCurr.reduce((sum, t) => sum + Number(t.total_amount), 0);
+      const totalSales = allCurr.reduce((sum, t) => sum + Number(t.total), 0);
       const totalTransactions = allCurr.length;
       let totalItemsSold = 0;
       allCurr.forEach((t) => {
@@ -520,7 +508,7 @@ export const api = {
         totalTransactions > 0 ? Math.round(totalSales / totalTransactions) : 0;
 
       // Previous Month Summary
-      const prevTotalSales = allPrev.reduce((sum, t) => sum + Number(t.total_amount), 0);
+      const prevTotalSales = allPrev.reduce((sum, t) => sum + Number(t.total), 0);
       const prevTotalTransactions = allPrev.length;
       let prevTotalItemsSold = 0;
       allPrev.forEach((t) => {
@@ -560,7 +548,7 @@ export const api = {
         const txDate = new Date(t.created_at);
         const day = txDate.getUTCDate();
         if (dailyMap[day]) {
-          dailyMap[day].total += Number(t.total_amount);
+          dailyMap[day].total += Number(t.total);
           dailyMap[day].count += 1;
         }
       });
@@ -586,7 +574,7 @@ export const api = {
           if (!productMap[key]) {
             productMap[key] = {
               productName: item.product_name,
-              categoryName: item.category_name || 'Umum',
+              categoryName: 'Menu',
               totalQty: 0,
               totalRevenue: 0,
             };
@@ -659,12 +647,12 @@ export const api = {
       const { data, error } = await queryBuilder;
       if (error) throw { response: { data: { message: error.message } } };
 
-      const { data: allTxs } = await supabase.from('transactions').select('cashier_id');
+      const { data: allTxs } = await supabase.from('transactions').select('user_id');
       const txCounts: Record<number, number> = {};
       if (allTxs) {
         allTxs.forEach((t) => {
-          if (t.cashier_id) {
-            txCounts[t.cashier_id] = (txCounts[t.cashier_id] || 0) + 1;
+          if (t.user_id) {
+            txCounts[t.user_id] = (txCounts[t.user_id] || 0) + 1;
           }
         });
       }
@@ -823,16 +811,12 @@ export const api = {
       const {
         invoiceNumber,
         cashierId,
-        cashierName,
         subtotal,
         discount,
         tax,
         totalAmount,
-        cashAmount,
-        changeAmount,
         paymentMethod,
         payment_method,
-        notes,
         items,
       } = bodyData;
 
@@ -840,8 +824,7 @@ export const api = {
       const savedUserStr = localStorage.getItem('kasirku_user');
       const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
 
-      const effectiveCashierId = cashierId || savedUser?.id || null;
-      const effectiveCashierName = cashierName || savedUser?.name || 'Kasir';
+      const effectiveUserId = Number(cashierId || savedUser?.id || 3);
       const effectivePaymentMethod = paymentMethod || payment_method || 'Cash';
 
       // Generate invoice format INV-YYYYMMDD-XXXX if not supplied
@@ -863,22 +846,20 @@ export const api = {
           ? Number(totalAmount)
           : Math.max(0, calculatedSubtotal - effectiveDiscount + effectiveTax);
 
+      // Insert into transactions (schema: id, invoice_number, user_id, subtotal, discount, tax, total, payment_method, status, created_at, updated_at)
       const { data: tx, error: txError } = await supabase
         .from('transactions')
         .insert({
           invoice_number: generatedInvoice,
-          cashier_id: effectiveCashierId,
-          cashier_name: effectiveCashierName,
+          user_id: effectiveUserId,
           subtotal: calculatedSubtotal,
           discount: effectiveDiscount,
           tax: effectiveTax,
-          total_amount: calculatedTotal,
-          cash_amount: cashAmount !== null && cashAmount !== undefined ? Number(cashAmount) : null,
-          change_amount: changeAmount !== null && changeAmount !== undefined ? Number(changeAmount) : null,
+          total: calculatedTotal,
           payment_method: effectivePaymentMethod,
-          notes: notes || null,
           status: 'Completed',
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -886,13 +867,13 @@ export const api = {
       if (txError) throw { response: { data: { message: txError.message } } };
 
       if (items && items.length > 0) {
-        // Look up category and buy_price for items if not present
+        // Look up product names if needed
         const productIds = items.map((i: any) => i.productId || i.product_id).filter(Boolean);
         let productsMap: Record<number, any> = {};
         if (productIds.length > 0) {
           const { data: prods } = await supabase
             .from('products')
-            .select('id, name, buy_price, sell_price, category_id, categories(name)')
+            .select('id, name, sell_price')
             .in('id', productIds);
           if (prods) {
             prods.forEach((p: any) => {
@@ -904,20 +885,15 @@ export const api = {
         const itemRows = items.map((item: any) => {
           const pid = item.productId || item.product_id || null;
           const prodInfo = pid ? productsMap[pid] : null;
-          const sellPrice = Number(item.sellPrice || item.price || prodInfo?.sell_price || 0);
-          const buyPrice = item.buyPrice !== undefined && item.buyPrice !== null
-            ? Number(item.buyPrice)
-            : (prodInfo?.buy_price !== null && prodInfo?.buy_price !== undefined ? Number(prodInfo.buy_price) : null);
+          const price = Number(item.sellPrice || item.price || prodInfo?.sell_price || 0);
           const quantity = Number(item.quantity || 1);
-          const itemSubtotal = Number(item.subtotal || sellPrice * quantity);
+          const itemSubtotal = Number(item.subtotal || price * quantity);
 
           return {
             transaction_id: tx.id,
             product_id: pid,
             product_name: item.productName || item.name || prodInfo?.name || 'Produk',
-            category_name: item.categoryName || prodInfo?.categories?.name || 'Umum',
-            buy_price: buyPrice,
-            sell_price: sellPrice,
+            price: price,
             quantity: quantity,
             subtotal: itemSubtotal,
           };
@@ -935,7 +911,8 @@ export const api = {
           transaction_id: tx.id,
           invoiceNumber: tx.invoice_number,
           invoice_number: tx.invoice_number,
-          totalAmount: Number(tx.total_amount),
+          totalAmount: Number(tx.total),
+          total: Number(tx.total),
         },
       });
     }
