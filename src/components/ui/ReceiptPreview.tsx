@@ -219,7 +219,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         </div>
 
         {/* Thermal Paper Feed Padding (Prevents Cutter slicing into the footer) */}
-        <div className="h-6 print:h-8" />
+        <div className="h-6 print:h-3" />
       </div>
 
       {/* Action Buttons: 3 Print Methods (Hidden when printing) */}
@@ -273,7 +273,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         </div>
       )}
 
-      {/* Print Specific CSS to isolate printable thermal area (Calibrated 48mm/72mm Thermal Print Head) */}
+      {/* Print Specific CSS to isolate printable thermal area (Strict Single-Page 48mm/72mm Calibrated) */}
       <style>{`
         @media print {
           @page {
@@ -286,6 +286,9 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             margin: 0 !important;
             padding: 0 !important;
             width: ${is58 ? '48mm' : '72mm'} !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
           }
           body * {
             visibility: hidden !important;
@@ -301,7 +304,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             max-width: ${is58 ? '48mm' : '72mm'} !important;
             box-sizing: border-box !important;
             margin: 0 !important;
-            padding: ${is58 ? '1mm 1mm 8mm 1mm' : '2mm 2mm 10mm 2mm'} !important;
+            padding: ${is58 ? '1mm 1mm 4mm 1mm' : '2mm 2mm 6mm 2mm'} !important;
             border: none !important;
             box-shadow: none !important;
             color: #000000 !important;
@@ -312,6 +315,10 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             line-height: 1.25 !important;
             letter-spacing: -0.2px !important;
             word-break: break-word !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>

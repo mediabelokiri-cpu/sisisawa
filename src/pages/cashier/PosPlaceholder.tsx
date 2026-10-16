@@ -299,7 +299,7 @@ export const PosPlaceholder: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#EFEFEF] text-slate-800 flex flex-col antialiased selection:bg-[#835227]/30">
       {/* 1. TOP GLOBAL NAVIGATION (Warm Roasted Brown #835227 Aesthetic) */}
-      <header className="sticky top-0 z-30 bg-[#835227] text-white border-b border-[#6F441E] px-4 sm:px-6 lg:px-8 py-3.5 shadow-md shadow-[#835227]/20">
+      <header className="sticky top-0 z-30 bg-[#835227] text-white border-b border-[#6F441E] px-4 sm:px-6 lg:px-8 py-3.5 shadow-md shadow-[#835227]/20 print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3 shrink-0">
@@ -441,7 +441,7 @@ export const PosPlaceholder: React.FC = () => {
 
       {/* 2. MAIN LAYOUT: CENTRAL CONTENT + RIGHT ORDER PANEL (Side-by-side on Tablets & Desktop) */}
       <main
-        className="max-w-[1700px] w-full mx-auto p-3 sm:p-4 md:p-5 lg:p-6 flex-1 flex flex-col md:flex-row gap-4 sm:gap-4 md:gap-5 lg:gap-6 items-start transition-all duration-150 origin-top"
+        className="max-w-[1700px] w-full mx-auto p-3 sm:p-4 md:p-5 lg:p-6 flex-1 flex flex-col md:flex-row gap-4 sm:gap-4 md:gap-5 lg:gap-6 items-start transition-all duration-150 origin-top print:hidden"
         style={{ zoom: `${zoomLevel}%` }}
       >
         {/* ================= LEFT / CENTRAL CONTENT ================= */}
@@ -1170,9 +1170,9 @@ export const PosPlaceholder: React.FC = () => {
 
       {/* ================= 4. RECEIPT MODAL (Thermal Receipt 58mm/80mm & Cashcow Driver) ================= */}
       {showReceiptModal && completedTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 my-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="text-center space-y-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto print:static print:inset-auto print:p-0 print:m-0 print:bg-transparent print:overflow-visible">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 my-auto print:shadow-none print:border-none print:p-0 print:m-0 print:w-auto print:max-w-none print:bg-transparent" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center space-y-1 print:hidden">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center mb-1">
                 <CheckCircle2 size={26} />
               </div>
@@ -1183,7 +1183,7 @@ export const PosPlaceholder: React.FC = () => {
             </div>
 
             {/* Embedded Receipt Component with Thermal 58mm/80mm & Cashcow Bluetooth/System print */}
-            <div className="max-h-[62vh] overflow-y-auto border border-slate-200 rounded-2xl p-2 bg-slate-50/60">
+            <div className="max-h-[62vh] overflow-y-auto border border-slate-200 rounded-2xl p-2 bg-slate-50/60 print:max-h-none print:overflow-visible print:border-none print:p-0 print:m-0 print:bg-transparent">
               <ReceiptPreview
                 detail={completedTransaction}
                 showActions={true}
