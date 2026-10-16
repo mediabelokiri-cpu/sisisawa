@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings,
   Store,
@@ -10,7 +11,14 @@ import {
   AlertCircle,
   RefreshCw,
   Percent,
-  Clock
+  Clock,
+  Tablet,
+  Smartphone,
+  Download,
+  Sparkles,
+  Share,
+  PlusSquare,
+  ShoppingCart
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -19,14 +27,27 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Modal } from '../../components/ui/Modal';
+import {
+  isStandaloneMode,
+  isAppleDevice,
+  getDeferredPrompt,
+  triggerPWAInstall
+} from '../../utils/pwaHelper';
 
 export const Pengaturan: React.FC = () => {
+  const navigate = useNavigate();
   const { refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'transaction' | 'receipt' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'transaction' | 'receipt' | 'system' | 'tablet'>('profile');
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  // PWA & Tablet Install States
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
 
   // 1. Profil Toko State
   const [storeProfile, setStoreProfile] = useState({
@@ -85,10 +106,51 @@ export const Pengaturan: React.FC = () => {
 
   useEffect(() => {
     fetchSettings();
+
+    // Check PWA & device status
+    setIsStandalone(isStandaloneMode());
+    setIsIOS(isAppleDevice());
+
+    const handlePromptAvailable = () => {
+      // Re-trigger re-render if deferredPrompt becomes available
+    };
+
+    window.addEventListener('pwa-prompt-available', handlePromptAvailable);
+    window.addEventListener('appinstalled', () => {
+      setIsStandalone(true);
+      showNotification('Aplikasi SISISAWA berhasil dipasang di perangkat!');
+    });
+
+    return () => {
+      window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
+    };
   }, []);
+
+  const handleInstallTablet = async () => {
+    if (isStandalone) {
+      showNotification('Aplikasi SISISAWA sudah terpasang dan aktif di perangkat ini.');
+      setIsInstallModalOpen(true);
+      return;
+    }
+
+    if (getDeferredPrompt()) {
+      const outcome = await triggerPWAInstall();
+      if (outcome === 'accepted') {
+        showNotification('Aplikasi SISISAWA sedang dipasang ke layar tablet...');
+        setIsStandalone(true);
+        setIsInstallModalOpen(false);
+        return;
+      }
+    }
+
+    // Open guide modal if deferred prompt is not directly available or on iOS/iPadOS
+    setIsInstallModalOpen(true);
+  };
 
   const handleSaveCurrentSection = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeTab === 'tablet') return;
+
     try {
       setSaving(true);
       setError('');
@@ -138,6 +200,8 @@ export const Pengaturan: React.FC = () => {
         return 'Struk Kasir';
       case 'system':
         return 'Sistem';
+      case 'tablet':
+        return 'Aplikasi Tablet';
       default:
         return 'Pengaturan';
     }
@@ -164,8 +228,22 @@ export const Pengaturan: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Tombol Install untuk Tablet di Header */}
           <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            onClick={handleInstallTablet}
+            icon={<Tablet size={18} className="text-white" />}
+            className="rounded-2xl bg-[#835227] hover:bg-[#6F441E] text-white font-bold shadow-md shadow-[#835227]/25 transition-all active:scale-95 cursor-pointer"
+          >
+            <span className="hidden sm:inline">Install untuk Tablet</span>
+            <span className="sm:hidden">Install Tablet</span>
+          </Button>
+
+          <Button
+            type="button"
             variant="outline"
             size="md"
             onClick={fetchSettings}
@@ -196,6 +274,7 @@ export const Pengaturan: React.FC = () => {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
         <button
+          type="button"
           onClick={() => setActiveTab('profile')}
           className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'profile'
@@ -208,6 +287,7 @@ export const Pengaturan: React.FC = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('transaction')}
           className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'transaction'
@@ -220,6 +300,7 @@ export const Pengaturan: React.FC = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('receipt')}
           className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'receipt'
@@ -232,6 +313,7 @@ export const Pengaturan: React.FC = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('system')}
           className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'system'
@@ -242,8 +324,21 @@ export const Pengaturan: React.FC = () => {
           <Globe size={18} />
           <span>Sistem</span>
         </button>
-      </div>
 
+        {/* Tab Baru Khusus Tablet */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('tablet')}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'tablet'
+              ? 'bg-[#835227] text-white font-black shadow-md shadow-[#835227]/25 scale-102'
+              : 'bg-white text-slate-600 hover:bg-[#CBC6B2]/20 border border-[#CBC6B2]/40 shadow-xs'
+          }`}
+        >
+          <Tablet size={18} />
+          <span>Aplikasi Tablet</span>
+        </button>
+      </div>
 
       {loading ? (
         <LoadingSpinner size="lg" label="Memuat pengaturan..." />
@@ -619,21 +714,313 @@ export const Pengaturan: React.FC = () => {
             </Card>
           )}
 
-          {/* Action Bar */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button
-              type="submit"
-              variant="accent"
-              size="lg"
-              loading={saving}
-              icon={<Save size={18} />}
-              className="font-bold min-w-[200px]"
-            >
-              Simpan {getTabLabel(activeTab)}
-            </Button>
-          </div>
+          {/* TAB 5: APLIKASI TABLET & PWA */}
+          {activeTab === 'tablet' && (
+            <div className="space-y-6">
+              {/* Hero Status Card */}
+              <Card className="p-6 sm:p-8 bg-gradient-to-br from-[#3E2410] to-[#2B1E16] text-white rounded-3xl border border-[#CBC6B2]/30 shadow-xl relative overflow-hidden">
+                <div className="absolute -top-16 -right-16 w-48 h-48 bg-[#835227]/40 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-start sm:items-center gap-4 sm:gap-5">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#835227] border-2 border-[#CBC6B2]/40 p-2 shrink-0 flex items-center justify-center shadow-lg overflow-hidden">
+                      <img src="/app-icon.png" alt="SISISAWA" className="w-full h-full object-cover rounded-2xl" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#CBC6B2] text-[#3E2410]">
+                          SISISAWA POS UMKM
+                        </span>
+                        {isStandalone ? (
+                          <span className="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 size={12} />
+                            <span>Terpasang di Layar Tablet</span>
+                          </span>
+                        ) : (
+                          <span className="px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <Sparkles size={12} />
+                            <span>Siap Di-install</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        Aplikasi Kasir Tablet & iPad
+                      </h3>
+                      <p className="text-xs sm:text-sm text-[#CBC6B2] max-w-xl leading-relaxed">
+                        Pasang aplikasi SISISAWA langsung ke layar utama tablet Anda. Buka kasir dengan 1-klik, layar penuh tanpa bilah browser (fullscreen), dan responsif untuk mode mendatar (landscape).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="lg"
+                      onClick={handleInstallTablet}
+                      icon={isStandalone ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Download size={18} />}
+                      className="w-full font-black rounded-2xl bg-[#835227] hover:bg-[#6F441E] text-white shadow-lg shadow-[#835227]/30 transition-all cursor-pointer py-3.5"
+                    >
+                      {isStandalone ? 'Sudah Terpasang (Buka Info)' : 'Install ke Tablet Sekarang'}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={() => navigate('/pos')}
+                      icon={<ShoppingCart size={18} />}
+                      className="w-full font-bold rounded-2xl bg-white/10 hover:bg-white/20 text-white border-white/20 cursor-pointer"
+                    >
+                      Buka Layar Kasir POS
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Panduan 2 Kolom: Android Tablet & Apple iPad */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. Android Tablet */}
+                <Card className="p-6 space-y-4 border-[#CBC6B2]/40 bg-white shadow-xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Smartphone size={22} />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-base text-slate-800">Tablet Android / Chrome</h4>
+                      <p className="text-xs text-slate-400">Samsung Galaxy Tab, Xiaomi Pad, Lenovo, HP Android</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-xs sm:text-sm text-slate-600">
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 block">Klik Tombol Install di Atas</strong>
+                        <span>Jika browser Chrome mendukung, pop-up konfirmasi install akan langsung muncul.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 block">Atau via Menu Titik Tiga (⋮)</strong>
+                        <span>Ketuk ikon titik tiga di sudut kanan atas browser Google Chrome.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 block">Pilih "Install Aplikasi"</strong>
+                        <span>Atau pilih opsi "Tambahkan ke Layar Utama" (Add to Home Screen).</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* 2. Apple iPad / iOS Safari */}
+                <Card className="p-6 space-y-4 border-[#CBC6B2]/40 bg-white shadow-xs">
+                  <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                    <div className="w-10 h-10 rounded-2xl bg-sky-500/10 text-sky-700 flex items-center justify-center shrink-0">
+                      <Tablet size={22} />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-base text-slate-800">Apple iPad & iPhone (Safari)</h4>
+                      <p className="text-xs text-slate-400">iPad Pro, iPad Air, iPad Mini, iOS Safari</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-xs sm:text-sm text-slate-600">
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 block">Buka dengan Safari</strong>
+                        <span>Pastikan Anda membuka alamat SISISAWA melalui browser bawaan Apple Safari.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 flex items-center gap-1.5">
+                          Ketuk Tombol Bagikan <Share size={15} className="text-[#835227]" />
+                        </strong>
+                        <span>Ikon kotak dengan panah mengarah ke atas di bar navigasi Safari.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="w-6 h-6 rounded-full bg-[#835227] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <div>
+                        <strong className="text-slate-800 flex items-center gap-1.5">
+                          Pilih "Tambah ke Layar Utama" <PlusSquare size={15} className="text-[#835227]" />
+                        </strong>
+                        <span>Gulir ke bawah dan ketuk opsi tersebut, lalu ketuk "Tambah" di pojok kanan atas.</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Kelebihan Mode Tablet */}
+              <Card className="p-6 bg-amber-50/50 border border-amber-200/60 rounded-3xl space-y-3">
+                <h4 className="font-black text-sm text-[#3E2410] uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles size={16} className="text-[#835227]" />
+                  <span>Keunggulan Menggunakan SISISAWA Mode Tablet:</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-700">
+                  <div className="p-3.5 bg-white rounded-2xl border border-amber-200/40 space-y-1">
+                    <p className="font-extrabold text-slate-900">🖥️ Layar Penuh (Fullscreen)</p>
+                    <p className="text-slate-500 leading-relaxed">Bebas dari URL bar, tab, atau bookmark browser. Kasir lebih fokus dan anti-salah klik.</p>
+                  </div>
+                  <div className="p-3.5 bg-white rounded-2xl border border-amber-200/40 space-y-1">
+                    <p className="font-extrabold text-slate-900">⚡ 1-Sentuhan Langsung Buka</p>
+                    <p className="text-slate-500 leading-relaxed">Icon toko Anda terpasang di homescreen tablet layaknya aplikasi native Android/iOS.</p>
+                  </div>
+                  <div className="p-3.5 bg-white rounded-2xl border border-amber-200/40 space-y-1">
+                    <p className="font-extrabold text-slate-900">🖨️ Cetak Bluetooth Instan</p>
+                    <p className="text-slate-500 leading-relaxed">Terhubung cepat ke printer thermal kasir 58mm/80mm untuk mencetak struk nota belanja.</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Action Bar (Hanya tampil jika bukan tab Tablet) */}
+          {activeTab !== 'tablet' && (
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="submit"
+                variant="accent"
+                size="lg"
+                loading={saving}
+                icon={<Save size={18} />}
+                className="font-bold min-w-[200px]"
+              >
+                Simpan {getTabLabel(activeTab)}
+              </Button>
+            </div>
+          )}
         </form>
       )}
+
+      {/* Modal Panduan Install Tablet */}
+      <Modal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        title="Pasang SISISAWA di Tablet / HP"
+        maxWidth="md"
+      >
+        <div className="p-5 sm:p-6 space-y-5">
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#3E2410] text-white">
+            <div className="w-14 h-14 rounded-2xl bg-[#835227] border border-[#CBC6B2]/40 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+              <img src="/app-icon.png" alt="SISISAWA" className="w-full h-full object-cover rounded-xl" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-black text-base text-white">SISISAWA Kasir UMKM</h4>
+                {isStandalone && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
+                    Aktif
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#CBC6B2]">Aplikasi POS Layar Sentuh Khusus Tablet & Smartphone</p>
+            </div>
+          </div>
+
+          {isStandalone ? (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm space-y-1">
+              <p className="font-extrabold flex items-center gap-1.5 text-emerald-900">
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                <span>Aplikasi Sudah Terpasang!</span>
+              </p>
+              <p className="text-emerald-700 text-xs leading-relaxed">
+                SISISAWA sudah terpasang di perangkat Anda dan berjalan dalam mode aplikasi layar penuh (standalone). Anda dapat membukanya kapan saja langsung dari layar utama tablet Anda.
+              </p>
+            </div>
+          ) : isIOS ? (
+            <div className="space-y-3 text-xs sm:text-sm text-slate-700">
+              <p className="font-bold text-[#835227] flex items-center gap-1.5">
+                <Tablet size={16} />
+                <span>Cara Pasang di iPad / iOS Safari:</span>
+              </p>
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <span>Ketuk tombol <strong className="inline-flex items-center gap-1 text-slate-900 font-extrabold"><Share size={14} className="text-[#835227]" /> Bagikan (Share)</strong> di bilah navigasi Safari.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <span>Gulir ke bawah dan ketuk <strong className="inline-flex items-center gap-1 text-slate-900 font-extrabold"><PlusSquare size={14} className="text-[#835227]" /> Tambahkan ke Layar Utama</strong>.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <span>Ketuk <strong className="text-slate-900 font-extrabold">"Tambah"</strong> di pojok kanan atas. Icon SISISAWA akan terpasang di homescreen.</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 text-xs sm:text-sm text-slate-700">
+              <p className="font-bold text-[#835227] flex items-center gap-1.5">
+                <Smartphone size={16} />
+                <span>Cara Pasang di Tablet Android / Chrome:</span>
+              </p>
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <span>Ketuk ikon menu titik tiga (<strong className="text-slate-900 font-black">⋮</strong>) di sudut kanan atas browser Chrome.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <span>Pilih opsi <strong className="text-slate-900 font-extrabold">"Install aplikasi"</strong> atau <strong className="text-slate-900 font-extrabold">"Tambahkan ke Layar Utama"</strong>.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#835227] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <span>Konfirmasi dengan mengetuk <strong className="text-slate-900 font-extrabold">"Install"</strong>.</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsInstallModalOpen(false);
+                navigate('/pos');
+              }}
+              className="text-xs font-bold text-[#835227] hover:underline cursor-pointer"
+            >
+              Buka Layar Kasir POS &rarr;
+            </button>
+            <Button
+              type="button"
+              variant="accent"
+              size="md"
+              onClick={() => setIsInstallModalOpen(false)}
+              className="rounded-xl px-6 font-bold"
+            >
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
