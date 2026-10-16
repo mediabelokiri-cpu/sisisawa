@@ -103,12 +103,16 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         </div>
       )}
 
-      {/* Thermal Receipt Body (Optimized for Cashcow & Standard Thermal Heads) */}
+      {/* Thermal Receipt Body (Optimized for 48mm/72mm Thermal Heads with Authentic POS Monospace) */}
       <div
         id="printable-receipt"
-        className={`w-full bg-white p-4 sm:p-5 rounded-2xl border border-slate-300 shadow-sm text-black font-mono leading-tight print:w-full print:max-w-none print:border-none print:shadow-none print:p-0 ${
-          is58 ? 'max-w-[310px] text-[11px]' : 'max-w-[380px] text-[12px]'
+        className={`w-full bg-white p-4 sm:p-5 rounded-2xl border border-slate-300 shadow-sm text-black leading-tight print:w-full print:max-w-none print:border-none print:shadow-none print:p-0 ${
+          is58 ? 'max-w-[290px] text-[10.5px]' : 'max-w-[380px] text-[12px]'
         }`}
+        style={{
+          fontFamily: "'Courier New', Courier, 'Lucida Console', Monaco, Consolas, monospace",
+          fontWeight: 600
+        }}
       >
         {/* Store Header */}
         <div className="text-center pb-2.5 border-b border-dashed border-slate-400 space-y-1">
@@ -132,31 +136,31 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         <div className="py-2 border-b border-dashed border-slate-400 space-y-1 text-[10px] sm:text-[11px]">
           <div className="flex justify-between">
             <span className="text-slate-600">No. Nota:</span>
-            <span className="font-bold text-black">{invoiceNumber}</span>
+            <span className="font-bold text-black pr-1">{invoiceNumber}</span>
           </div>
 
           {(receiptConfig?.show_datetime ?? true) && (
             <div className="flex justify-between">
               <span className="text-slate-600">Waktu:</span>
-              <span>{formatReceiptDate(createdAt)} WITA</span>
+              <span className="pr-1">{formatReceiptDate(createdAt)} WITA</span>
             </div>
           )}
 
           {(receiptConfig?.show_cashier ?? true) && (
             <div className="flex justify-between">
               <span className="text-slate-600">Kasir:</span>
-              <span className="font-bold">{cashierName}</span>
+              <span className="font-bold pr-1">{cashierName}</span>
             </div>
           )}
 
           <div className="flex justify-between">
             <span className="text-slate-600">Pembayaran:</span>
-            <span className="font-bold">{paymentMethod}</span>
+            <span className="font-bold pr-1">{paymentMethod}</span>
           </div>
 
           <div className="flex justify-between">
             <span className="text-slate-600">Status:</span>
-            <span className="font-extrabold text-black">
+            <span className="font-extrabold text-black pr-1">
               {transaction.status.toUpperCase()}
             </span>
           </div>
@@ -171,7 +175,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
                 <span>
                   {item.quantity} x {formatReceiptMoney(Number(item.price))}
                 </span>
-                <span className="font-extrabold text-black">{formatReceiptMoney(Number(item.subtotal))}</span>
+                <span className="font-extrabold text-black pr-1">{formatReceiptMoney(Number(item.subtotal))}</span>
               </div>
             </div>
           ))}
@@ -181,26 +185,26 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         <div className="py-2 border-b border-dashed border-slate-400 space-y-1 text-[10px] sm:text-[11px]">
           <div className="flex justify-between">
             <span className="text-slate-700">Subtotal:</span>
-            <span>Rp {formatReceiptMoney(Number(transaction.subtotal))}</span>
+            <span className="pr-1 font-bold">Rp {formatReceiptMoney(Number(transaction.subtotal))}</span>
           </div>
 
           {Number(transaction.discount) > 0 && (
             <div className="flex justify-between font-bold">
               <span>Diskon:</span>
-              <span>-Rp {formatReceiptMoney(Number(transaction.discount))}</span>
+              <span className="pr-1">-Rp {formatReceiptMoney(Number(transaction.discount))}</span>
             </div>
           )}
 
           {Number(transaction.tax) > 0 && (
             <div className="flex justify-between">
               <span>Pajak (Tax):</span>
-              <span>+Rp {formatReceiptMoney(Number(transaction.tax))}</span>
+              <span className="pr-1">+Rp {formatReceiptMoney(Number(transaction.tax))}</span>
             </div>
           )}
 
           <div className="flex justify-between text-xs sm:text-sm font-black pt-1.5 border-t border-slate-900 text-black">
             <span>TOTAL:</span>
-            <span>Rp {formatReceiptMoney(Number(transaction.total))}</span>
+            <span className="pr-1">Rp {formatReceiptMoney(Number(transaction.total))}</span>
           </div>
         </div>
 
@@ -269,7 +273,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         </div>
       )}
 
-      {/* Print Specific CSS to isolate printable thermal area */}
+      {/* Print Specific CSS to isolate printable thermal area (Calibrated 48mm/72mm Thermal Print Head) */}
       <style>{`
         @media print {
           @page {
@@ -281,7 +285,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
-            width: ${is58 ? '58mm' : '80mm'} !important;
+            width: ${is58 ? '48mm' : '72mm'} !important;
           }
           body * {
             visibility: hidden !important;
@@ -293,17 +297,21 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: ${is58 ? '58mm' : '80mm'} !important;
-            max-width: ${is58 ? '58mm' : '80mm'} !important;
+            width: ${is58 ? '48mm' : '72mm'} !important;
+            max-width: ${is58 ? '48mm' : '72mm'} !important;
+            box-sizing: border-box !important;
             margin: 0 !important;
-            padding: ${is58 ? '2mm 3mm 10mm 3mm' : '3mm 4mm 12mm 4mm'} !important;
+            padding: ${is58 ? '1mm 1mm 8mm 1mm' : '2mm 2mm 10mm 2mm'} !important;
             border: none !important;
             box-shadow: none !important;
             color: #000000 !important;
             background: #ffffff !important;
-            font-family: 'Courier New', Courier, monospace, Consolas !important;
-            font-size: ${is58 ? '11px' : '12px'} !important;
+            font-family: 'Courier New', Courier, 'Lucida Console', Monaco, Consolas, monospace !important;
+            font-size: ${is58 ? '9.5px' : '11.5px'} !important;
+            font-weight: 600 !important;
             line-height: 1.25 !important;
+            letter-spacing: -0.2px !important;
+            word-break: break-word !important;
           }
         }
       `}</style>

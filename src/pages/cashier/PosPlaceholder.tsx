@@ -415,10 +415,10 @@ export const PosPlaceholder: React.FC = () => {
               </div>
             </div>
 
-            {/* Cart Trigger Badge (Pill button with item counter) */}
+            {/* Cart Trigger Badge (Mobile Only <768px) */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="lg:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-white text-[#835227] font-black text-xs shadow-md active:scale-95 transition-transform"
+              className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-white text-[#835227] font-black text-xs shadow-md active:scale-95 transition-transform"
             >
               <ShoppingCart size={16} />
               <span>{totalItemCount}</span>
@@ -439,9 +439,9 @@ export const PosPlaceholder: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. MAIN LAYOUT: CENTRAL CONTENT + RIGHT ORDER PANEL */}
+      {/* 2. MAIN LAYOUT: CENTRAL CONTENT + RIGHT ORDER PANEL (Side-by-side on Tablets & Desktop) */}
       <main
-        className="max-w-[1600px] w-full mx-auto p-3 sm:p-4 lg:p-6 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-5 lg:gap-6 items-start transition-all duration-150 origin-top"
+        className="max-w-[1700px] w-full mx-auto p-3 sm:p-4 md:p-5 lg:p-6 flex-1 flex flex-col md:flex-row gap-4 sm:gap-4 md:gap-5 lg:gap-6 items-start transition-all duration-150 origin-top"
         style={{ zoom: `${zoomLevel}%` }}
       >
         {/* ================= LEFT / CENTRAL CONTENT ================= */}
@@ -563,7 +563,7 @@ export const PosPlaceholder: React.FC = () => {
           {/* D. PRODUCT CARDS GRID (3 Columns on Tablets/iPad & Desktop) */}
           <div>
             {loading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <div key={n} className="bg-white rounded-3xl p-3 sm:p-3.5 border border-slate-100 space-y-3 animate-pulse">
                     <div className="w-full h-32 sm:h-36 bg-slate-100 rounded-2xl" />
@@ -619,7 +619,7 @@ export const PosPlaceholder: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {filteredProducts.map((product) => {
                   const isAvailable = product.status === 'AVAILABLE';
                   const cartItem = cart.find((i) => i.product.id === product.id);
@@ -721,9 +721,9 @@ export const PosPlaceholder: React.FC = () => {
           </div>
         </div>
 
-        {/* Floating Bottom Bar for Tablet Portrait & Mobile (<1024px) */}
+        {/* Floating Bottom Bar for Mobile Only (<768px) */}
         {cart.length > 0 && !isDrawerOpen && (
-          <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40 max-w-lg mx-auto animate-in slide-in-from-bottom duration-200">
+          <div className="md:hidden fixed bottom-4 left-4 right-4 z-40 max-w-lg mx-auto animate-in slide-in-from-bottom duration-200">
             <div
               onClick={() => setIsDrawerOpen(true)}
               className="p-3.5 sm:p-4 rounded-3xl bg-[#3E2410] text-white shadow-2xl flex items-center justify-between gap-3 border border-[#CBC6B2]/40 cursor-pointer active:scale-98 transition-transform"
@@ -752,24 +752,24 @@ export const PosPlaceholder: React.FC = () => {
         )}
 
         {/* ================= RIGHT SIDEBAR: "MY ORDER / PESANAN KASIR" ================= */}
-        {/* Responsive Desktop Side Panel & Mobile Drawer Container */}
+        {/* Permanent Side-by-Side on Tablets (md: >=768px) & Desktop */}
         <div
-          className={`lg:w-80 xl:w-92 shrink-0 ${
+          className={`md:w-72 lg:w-80 xl:w-92 shrink-0 ${
             isDrawerOpen
-              ? 'fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/60 backdrop-blur-xs lg:static lg:bg-transparent lg:z-auto'
-              : 'hidden lg:block'
+              ? 'fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/60 backdrop-blur-xs md:static md:bg-transparent md:z-auto'
+              : 'hidden md:block'
           }`}
         >
-          {/* Drawer Wrapper for Mobile / Floating Sidebar for Desktop */}
+          {/* Drawer Wrapper for Mobile / Floating Sidebar for Tablet & Desktop */}
           <div
-            className="w-full h-[90vh] lg:h-auto max-h-[calc(100vh-6rem)] lg:sticky lg:top-24 bg-white rounded-t-3xl lg:rounded-3xl border border-slate-100 shadow-xl lg:shadow-subtle-lg p-5 sm:p-6 flex flex-col justify-between overflow-hidden"
+            className="w-full h-[90vh] md:h-auto max-h-[calc(100vh-5.5rem)] md:sticky md:top-20 bg-white rounded-t-3xl md:rounded-3xl border border-[#CBC6B2]/40 shadow-xl md:shadow-md p-4 sm:p-5 lg:p-6 flex flex-col justify-between overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Order Panel Header */}
             <div>
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
                     <span>Pesanan Kasir</span>
                     <span>🛒</span>
                   </h3>
@@ -785,7 +785,7 @@ export const PosPlaceholder: React.FC = () => {
                   {cart.length > 0 && (
                     <button
                       onClick={clearCart}
-                      className="text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                      className="text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                       title="Kosongkan Keranjang"
                     >
                       Reset
@@ -793,7 +793,7 @@ export const PosPlaceholder: React.FC = () => {
                   )}
                   <button
                     onClick={() => setIsDrawerOpen(false)}
-                    className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                    className="md:hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
                   >
                     <X size={20} />
                   </button>
