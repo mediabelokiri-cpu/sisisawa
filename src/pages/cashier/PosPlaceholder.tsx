@@ -57,6 +57,50 @@ export const PosPlaceholder: React.FC = () => {
   const [personCount, setPersonCount] = useState<number>(1);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
+  // Zoom Level state for POS Screen (70% - 130%, default 100%, persisted in localStorage)
+  const [zoomLevel, setZoomLevel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sisisawa_pos_zoom');
+      const parsed = saved ? parseInt(saved, 10) : 100;
+      return parsed >= 70 && parsed <= 130 ? parsed : 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => {
+      const next = Math.min(130, prev + 10);
+      try {
+        localStorage.setItem('sisisawa_pos_zoom', String(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => {
+      const next = Math.max(70, prev - 10);
+      try {
+        localStorage.setItem('sisisawa_pos_zoom', String(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(100);
+    try {
+      localStorage.setItem('sisisawa_pos_zoom', '100');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Time state (WITA Asia/Makassar)
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -310,6 +354,40 @@ export const PosPlaceholder: React.FC = () => {
               <span>{currentTime}</span>
             </div>
 
+            {/* Zoom In & Zoom Out Controller (- 100% +) */}
+            <div className="flex items-center bg-black/20 backdrop-blur-xs border border-white/20 rounded-full p-1 text-white shadow-inner gap-0.5 sm:gap-1">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 70}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="Perkecil Tampilan (Zoom Out -10%)"
+                aria-label="Perkecil Tampilan"
+              >
+                <Minus size={13} className="stroke-[3]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                className="px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs font-black tracking-tight hover:text-[#CBC6B2] transition-colors cursor-pointer select-none rounded-md hover:bg-white/10"
+                title="Klik untuk Reset Ukuran ke 100%"
+              >
+                {zoomLevel}%
+              </button>
+
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 130}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="Perbesar Tampilan (Zoom In +10%)"
+                aria-label="Perbesar Tampilan"
+              >
+                <Plus size={13} className="stroke-[3]" />
+              </button>
+            </div>
+
             {/* Quick Admin Panel Link (if role is ADMIN) */}
             {user?.role === 'ADMIN' && (
               <button
@@ -362,7 +440,10 @@ export const PosPlaceholder: React.FC = () => {
       </header>
 
       {/* 2. MAIN LAYOUT: CENTRAL CONTENT + RIGHT ORDER PANEL */}
-      <div className="max-w-[1600px] w-full mx-auto p-3 sm:p-4 lg:p-6 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-5 lg:gap-6 items-start">
+      <main
+        className="max-w-[1600px] w-full mx-auto p-3 sm:p-4 lg:p-6 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-5 lg:gap-6 items-start transition-all duration-150 origin-top"
+        style={{ zoom: `${zoomLevel}%` }}
+      >
         {/* ================= LEFT / CENTRAL CONTENT ================= */}
         <div className="flex-1 min-w-0 w-full space-y-6">
           {/* A. SECTION HEADER & DINE-IN/TAKE-AWAY SWITCHER */}
@@ -920,7 +1001,7 @@ export const PosPlaceholder: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* ================= 3. PAYMENT MODAL ================= */}
       {showPaymentModal && (
